@@ -4,6 +4,14 @@ The shared CRM database powers the overview, feedback register, spreadsheet view
 
 The weekly check-in asks four things: mood (1–5), how studies, housing/host family, social life & friends, health & wellbeing and money are going (good / OK / difficult), whether the student needs support (no / yes, not urgent / yes, contact me this week / yes, urgent), and an optional comment. Separate messages ask for support, an optional topic and the message.
 
+## Consultant calls
+
+When a student answers "Yes, it's urgent" in the weekly check-in, the form offers the open consultant slots (Maria, Francesco, Giorgia) and the student can book one. Booking is optional: the check-in is saved either way, and a student whose chosen time was taken in the meantime can pick another or skip on the thank-you page. A slot can only be booked once, and a check-in can hold at most one booking. Times are stored in UTC and shown in Italian time (students also see their own local time when it differs).
+
+Staff see all slots from today onward on the Calendar page, grouped by day: open, booked and cancelled, with the student, the consultant's name and phone number, and the note from the urgent check-in. Staff can cancel a booked appointment; the student is not notified automatically and the cancelled time is not offered again. Consultants and slots live in the `consultants` and `slots` tables (`drizzle/0002_consultant_calendar.sql`). The first time the app runs with no slots it creates example slots for the next three working days; there is no screen yet for adding real availability.
+
+## Follow-ups
+
 An explicit urgent request is flagged urgent. A low mood rating, any "difficult" area, any other request for support, or a separate message opens a follow-up. Requests to be contacted this week are listed first after urgent ones. Staff can mark follow-ups in progress or resolved. CSV export includes all responses.
 
 ## Running locally

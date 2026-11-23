@@ -195,6 +195,40 @@ const IT={
  'Your Gobeyond team has received your message.':'Il tuo team Gobeyond ha ricevuto il tuo messaggio.',
  'Your Gobeyond team has received your check-in.':'Il tuo team Gobeyond ha ricevuto il tuo check-in.',
  'Send another message':'Invia un altro messaggio',
+ // Consultant call booking (student) and Calendar (staff)
+ 'Calendar':'Calendario',
+ 'Consultant calls booked by students who asked for urgent support.':'Chiamate con i consulenti prenotate dagli studenti che hanno chiesto supporto urgente.',
+ 'Times are in Italian time.':'Gli orari sono in ora italiana.',
+ 'Time':'Orario',
+ 'Consultant':'Consulente',
+ 'Check-in note':'Nota del check-in',
+ 'slot|Open':'Libero',
+ 'Booked':'Prenotato',
+ 'Cancelled':'Annullato',
+ 'Cancel':'Annulla',
+ 'No consultant slots from today onward.':'Nessun orario dei consulenti da oggi in poi.',
+ 'Cancel appointment?':'Annullare l’appuntamento?',
+ '{student} with {consultant}, {day} at {time} (Italian time).':'{student} con {consultant}, {day} alle {time} (ora italiana).',
+ 'The student is not notified automatically, and this time will not be offered again.':'Lo studente non viene avvisato automaticamente e questo orario non verrà più proposto.',
+ 'Cancel appointment':'Annulla appuntamento',
+ 'Keep appointment':'Mantieni appuntamento',
+ 'Book a call with a consultant (optional)':'Prenota una chiamata con un consulente (facoltativo)',
+ 'Choose a time if you’d like to talk to one of our consultants. Times are in Italian time.':'Scegli un orario se vuoi parlare con uno dei nostri consulenti. Gli orari sono in ora italiana.',
+ 'Loading available times…':'Caricamento degli orari disponibili…',
+ 'Available times could not be loaded. Your team will contact you.':'Non è stato possibile caricare gli orari disponibili. Il tuo team ti contatterà.',
+ 'No times are available right now. Your team will contact you.':'Al momento non ci sono orari disponibili. Il tuo team ti contatterà.',
+ 'with {name}':'con {name}',
+ '{time} your time':'{time} ora locale',
+ 'No call for now':'Per ora nessuna chiamata',
+ 'Call booked with {name}':'Chiamata prenotata con {name}',
+ '{day} at {time} (Italian time)':'{day} alle {time} (ora italiana)',
+ 'Consultant’s phone: {phone}':'Telefono del consulente: {phone}',
+ 'That time was just booked by someone else. Your check-in is saved. Choose another time or skip.':'Quell’orario è appena stato prenotato da qualcun altro. Il tuo check-in è stato salvato. Scegli un altro orario o salta.',
+ 'Book call':'Prenota la chiamata',
+ 'Skip':'Salta',
+ 'Choose a time first.':'Scegli prima un orario.',
+ 'Calls can only be booked from an urgent check-in this week.':'Le chiamate si possono prenotare solo da un check-in urgente di questa settimana.',
+ 'The appointment was not found or is already cancelled.':'L’appuntamento non è stato trovato o è già stato annullato.',
  // Messages returned by the server
  'Unable to reach the CRM.':'Impossibile raggiungere il CRM.',
  'Something went wrong.':'Si è verificato un errore.',
@@ -263,6 +297,49 @@ const areaSummary=r=>{
 };
 // Same rules as the server: urgent request -> urgent; any request, message, low mood or a "Difficult" area -> follow-up.
 const priorityFor=r=>r.need==='urgent'?'urgent':r.need!=='none'||r.kind==='message'||Number(r.mood)<=2||areas.some(([key])=>r[key]==='difficult')?'follow':'routine';
+// Consultant calls: times are stored in UTC and shown in Italian time (plus the viewer's own time when it differs).
+const callZone='Europe/Rome';
+const localZone=Intl.DateTimeFormat().resolvedOptions().timeZone;
+const locale=()=>lang==='it'?'it-IT':'en-GB';
+const callDay=(iso,zone=callZone)=>new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(iso));
+const callTime=(iso,zone=callZone)=>new Intl.DateTimeFormat(locale(),{timeZone:zone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(iso));
+// Italian weekdays are lower case mid-sentence ("martedì"), so headings pass atStart=true.
+const callDayLabel=(iso,atStart=true)=>{
+ const label=new Intl.DateTimeFormat(locale(),{timeZone:callZone,weekday:'long',day:'numeric',month:'long'}).format(new Date(iso));
+ return atStart?capital(label):label;
+};
+const localCallTime=iso=>{
+ const sameDay=callDay(iso,localZone)===callDay(iso);
+ if(sameDay&&callTime(iso,localZone)===callTime(iso))return '';
+ const weekday=sameDay?'':new Intl.DateTimeFormat(locale(),{timeZone:localZone,weekday:'short'}).format(new Date(iso))+' ';
+ return t('{time} your time',{time:weekday+callTime(iso,localZone)});
+};
+// Translation that can differ by context, e.g. a slot that is "Open" is "Libero" in Italian.
+const tIn=(context,text)=>lang==='it'&&Object.hasOwn(IT,context+'|'+text)?IT[context+'|'+text]:t(text);
+const slotClass=status=>status==='open'?'resolved':status==='cancelled'?'cancelled':'booked';
+const slotLabel=status=>tIn('slot',capital(status));
+const phoneLink=phone=>`<a href="tel:${esc(String(phone).replace(/\s+/g,''))}">${esc(phone)}</a>`;
+// Sample-workspace consultants and slots (the live app gets the same ones from the server).
+const consultantList=[['maria','Maria','+39 320 123 4567'],['francesco','Francesco','+39 331 234 5678'],['giorgia','Giorgia','+39 342 345 6789']];
+const exampleTimes={maria:['09:30','14:00'],francesco:['11:00','16:00'],giorgia:['10:00','15:30']};
+function italianTime(date,time){
+ const [y,m,dd]=date.split('-').map(Number),[h,mi]=time.split(':').map(Number);
+ const wanted=Date.UTC(y,m-1,dd,h,mi);
+ let utc=wanted;
+ for(let i=0;i<2;i++){
+  const p=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:callZone,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).formatToParts(new Date(utc)).map(part=>[part.type,part.value]));
+  utc+=wanted-Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute);
+ }
+ return new Date(utc).toISOString();
+}
+function exampleSlots(){
+ const days=[];
+ for(let offset=1;days.length<3;offset++){const date=dateAfter(offset);const weekday=new Date(date+'T12:00:00Z').getUTCDay();if(weekday!==0&&weekday!==6)days.push(date);}
+ return days.flatMap(date=>consultantList.flatMap(([key,name,phone])=>exampleTimes[key].map(time=>{
+  const starts_at=italianTime(date,time);
+  return {id:key+'-'+date+'-'+time.replace(':',''),starts_at,ends_at:new Date(Date.parse(starts_at)+30*60000).toISOString(),status:'open',consultant_name:name,consultant_phone:phone,student_name:null,feedback_id:null,note:null};
+ })));
+}
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const capital=value=>value.charAt(0).toUpperCase()+value.slice(1);
 const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -282,18 +359,27 @@ const examples=[
  ['Alice Marino','Boston, USA',4,'none','good,good,good,ok,ok','I’m feeling a lot more at home this week.'],
  ['Leonardo Costa','Oxford, UK'],['Beatrice Gallo','Ottawa, Canada']
 ];
-const exampleData=()=>({
- students:examples.map(([name,destination],i)=>({id:'sample-'+i,name,destination,email:'student'+i+'@example.com',start_date:dateAfter(-60),end_date:dateAfter(90)})),
- feedback:examples.slice(0,6).map(([name,destination,mood,need,answers,note],i)=>{
+const exampleData=()=>{
+ const feedback=examples.slice(0,6).map(([name,destination,mood,need,answers,note],i)=>{
   const record={id:'demo-'+i,student_id:'sample-'+i,name,destination,kind:'check-in',week:currentWeek,mood,need,topic:'',note,
    created_at:new Date(Date.now()-i*7200000).toISOString()};
   answers.split(',').forEach((value,j)=>{record[areas[j][0]]=value;});
   record.priority=priorityFor(record);
   record.status=i===4?'in progress':record.priority==='routine'?'resolved':'open';
   return record;
- }),day,week:currentWeek,integrations:{sheet:false,reminder:false}
-});
-const demoKey='gobeyond-demo-v2';
+ });
+ // Sample calendar: the urgent sample check-in has one booked call and one cancelled one.
+ const slots=exampleSlots();
+ const urgent=feedback.find(r=>r.need==='urgent');
+ const assign=(slot,status)=>Object.assign(slot,{status,student_name:urgent.name,feedback_id:urgent.id,note:urgent.note});
+ assign(slots.find(s=>s.id.startsWith('maria-')&&s.id.endsWith('-1400')),'booked');
+ assign(slots.find(s=>s.id.startsWith('giorgia-')),'cancelled');
+ return {
+  students:examples.map(([name,destination],i)=>({id:'sample-'+i,name,destination,email:'student'+i+'@example.com',start_date:dateAfter(-60),end_date:dateAfter(90)})),
+  feedback,slots,day,week:currentWeek,integrations:{sheet:false,reminder:false}
+ };
+};
+const demoKey='gobeyond-demo-v3';
 function readDemo(){
  try {const data=JSON.parse(localStorage.getItem(demoKey));if(data?.week===currentWeek) return data;}catch{}
  return exampleData();
@@ -314,7 +400,7 @@ function pill(r){
  return `<span class="pill ${r.status==='resolved'?'resolved':r.priority}">${t(label)}</span>`;
 }
 function studentLink(s){return location.origin+'/check-in#'+s.token;}
-const views=[['overview','Overview'],['feedback','Feedback'],['students','Students'],['support','Support queue'],['sheet','Spreadsheet'],['settings','Settings']];
+const views=[['overview','Overview'],['feedback','Feedback'],['students','Students'],['support','Support queue'],['calendar','Calendar'],['sheet','Spreadsheet'],['settings','Settings']];
 
 let data,view='overview',demo=false,search='',filter='all';
 const active=()=>data.students.filter(s=>s.start_date<=data.day&&s.end_date>=data.day);
@@ -355,8 +441,38 @@ function overview(){
  <div class="card"><div class="card-head"><div><h2>${t('Support queue')}</h2><p>${t('Students who may need help')}</p></div></div><div class="queue">${open.length?open.slice(0,5).map(r=>`<button class="queue-item" data-record="${esc(r.id)}">${avatar(r.name)}<span class="copy"><b>${esc(r.name)}</b><small>${esc(queueReason(r))}</small></span>${pill(r)}</button>`).join(''):`<p class="empty">${t('No open follow-ups.')}</p>`}</div></div>
  </section>`;
 }
+// Staff calendar: consultant slots from today onward, grouped by day (Italian time).
+function calendarView(){
+ const today=callDay(new Date().toISOString());
+ const slots=(data.slots||[]).filter(s=>callDay(s.starts_at)>=today).sort((a,b)=>a.starts_at.localeCompare(b.starts_at)||a.consultant_name.localeCompare(b.consultant_name));
+ const total=status=>slots.filter(s=>s.status===status).length;
+ const days=[...new Set(slots.map(s=>callDay(s.starts_at)))];
+ const row=s=>`<tr class="slot-${s.status}"><td><b>${callTime(s.starts_at)}–${callTime(s.ends_at)}</b></td><td><b>${esc(s.consultant_name)}</b><span class="cell-sub">${phoneLink(s.consultant_phone)}</span></td><td><span class="pill ${slotClass(s.status)}">${slotLabel(s.status)}</span>${s.status==='booked'?`<span class="cell-sub"><button class="row-link danger" data-cancel-slot="${esc(s.id)}">${t('Cancel')}</button></span>`:''}</td><td class="student-cell">${s.student_name?esc(s.student_name):'—'}</td><td class="note-cell">${s.status==='open'?'—':esc(s.note)||t('No written comment.')}</td></tr>`;
+ return title('Calendar','Consultant calls booked by students who asked for urgent support.')+
+  `<div class="calendar-legend">${['open','booked','cancelled'].map(status=>`<span class="pill ${slotClass(status)}">${slotLabel(status)}: ${total(status)}</span>`).join('')}<span class="muted">${t('Times are in Italian time.')}</span></div>`+
+  (days.length?days.map(key=>{
+   const list=slots.filter(s=>callDay(s.starts_at)===key);
+   return `<section class="card calendar-day"><div class="card-head"><h2>${callDayLabel(list[0].starts_at)}</h2></div>${table(['Time','Consultant','Status','Student','Check-in note'],list.map(row))}</section>`;
+  }).join(''):`<section class="card"><p class="empty">${t('No consultant slots from today onward.')}</p></section>`);
+}
+function cancelDialog(slot){
+ openDialog(t('Cancel appointment?'),`<p class="sub">${t('{student} with {consultant}, {day} at {time} (Italian time).',{student:esc(slot.student_name),consultant:esc(slot.consultant_name),day:callDayLabel(slot.starts_at,false),time:callTime(slot.starts_at)})}</p>
+ <p class="footnote">${t('The student is not notified automatically, and this time will not be offered again.')}</p><br>
+ <form><p class="error" role="alert"></p><div class="actions"><button class="btn danger">${t('Cancel appointment')}</button><button type="button" class="btn" data-keep>${t('Keep appointment')}</button></div></form>`);
+ const form=detail.querySelector('form');
+ form.querySelector('[data-keep]').onclick=()=>detail.close();
+ form.onsubmit=async event=>{
+  event.preventDefault();
+  try{
+   if(demo){const stored=data.slots.find(s=>s.id===slot.id);Object.assign(stored,{status:'cancelled',cancelled_at:new Date().toISOString()});saveDemo(data);}
+   else{await request('/api/appointments/cancel',{id:slot.id});data=await request('/api/data');}
+   detail.close();render();
+  }catch(error){showError(form,error);}
+ };
+}
 function dataView(){
  if(view==='overview') return overview();
+ if(view==='calendar') return calendarView();
  if(view==='students') return title('Students','Manage program dates and personal check-in links.',btn('Add student','add','plus',true))+
   `<section class="card"><div class="card-head"><h2>${t('Student directory')}</h2></div>${table(['Student','Email','Program dates','This week',''],data.students.map(s=>{
    const received=current().some(r=>r.student_id===s.id);
@@ -488,6 +604,10 @@ app.addEventListener('click',async event=>{
   const record=data.feedback.find(r=>r.id===button.dataset.record);
   if(record)recordDialog(record);
  }
+ if(button.dataset.cancelSlot){
+  const slot=(data.slots||[]).find(s=>s.id===button.dataset.cancelSlot);
+  if(slot)cancelDialog(slot);
+ }
  if(button.dataset.copy){
   const student=data.students.find(s=>s.id===button.dataset.copy);
   if(!student)return;
@@ -509,10 +629,68 @@ async function formPage(){
  }
  if(student.submitted)kind='message';
  let submissionId=crypto.randomUUID();
- function thanks(message){
-  rerender=()=>thanks(message);
-  app.innerHTML=shell(t('Thanks for sharing'),t('Your response has been saved.'),`<p class="muted">${t(message?'Your Gobeyond team has received your message.':'Your Gobeyond team has received your check-in.')}</p><button id="another" class="btn primary">${t('Send another message')}</button> ${preview?`<a href="/?demo=1" class="btn">${t('Open sample workspace')}</a>`:''}`);
+ // Optional consultant call booking, offered when the student answers "Yes, it's urgent".
+ let slotsState='idle',slotList=[],chosenSlot='';
+ const loadSlots=async()=>(preview
+  ?readDemo().slots.filter(s=>s.status==='open'&&s.starts_at>new Date().toISOString())
+  :(await request('/api/slots',{token})).slots).sort((a,b)=>a.starts_at.localeCompare(b.starts_at)||a.consultant_name.localeCompare(b.consultant_name));
+ function fetchSlots(){
+  slotsState='loading';
+  loadSlots().then(list=>{slotList=list;slotsState='ready';}).catch(()=>{slotList=[];slotsState='error';})
+   .finally(()=>{const box=document.querySelector('#booking');if(box&&!box.hidden)box.innerHTML=slotPicker();});
+ }
+ function slotPicker(){
+  if(slotsState==='idle')fetchSlots();
+  const head=`<h3>${t('Book a call with a consultant (optional)')}</h3><p class="muted">${t('Choose a time if you’d like to talk to one of our consultants. Times are in Italian time.')}</p>`;
+  if(slotsState==='loading')return head+`<p class="muted">${t('Loading available times…')}</p>`;
+  if(slotsState==='error')return head+`<p class="muted">${t('Available times could not be loaded. Your team will contact you.')}</p>`;
+  if(!slotList.length)return head+`<p class="muted">${t('No times are available right now. Your team will contact you.')}</p>`;
+  const days=[...new Set(slotList.map(s=>callDay(s.starts_at)))];
+  return head+days.map(key=>{
+   const list=slotList.filter(s=>callDay(s.starts_at)===key);
+   return `<div class="slot-day"><b>${callDayLabel(list[0].starts_at)}</b><div class="slot-grid">${list.map(s=>{
+    const local=localCallTime(s.starts_at);
+    return `<label><input type="radio" name="slot" value="${esc(s.id)}" ${chosenSlot===s.id?'checked':''}><span><b>${callTime(s.starts_at)}</b><small>${t('with {name}',{name:esc(s.consultant_name)})}</small>${local?`<small>${esc(local)}</small>`:''}</span></label>`;
+   }).join('')}</div></div>`;
+  }).join('')+`<label class="slot-skip"><input type="radio" name="slot" value=""><span>${t('No call for now')}</span></label>`;
+ }
+ function demoBook(slotId,record){
+  const mock=readDemo();
+  const existing=mock.slots.find(s=>s.feedback_id===record.id&&s.status==='booked');
+  if(existing)return {status:'booked',slot:existing};
+  const slot=mock.slots.find(s=>s.id===slotId);
+  if(!slot||slot.status!=='open'||slot.starts_at<=new Date().toISOString())return {status:'taken'};
+  Object.assign(slot,{status:'booked',student_name:record.name,feedback_id:record.id,note:record.note||'',booked_at:new Date().toISOString()});
+  saveDemo(mock);
+  return {status:'booked',slot};
+ }
+ function bookingSummary(slot){
+  const local=localCallTime(slot.starts_at);
+  return `<div class="booked-box"><b>${t('Call booked with {name}',{name:esc(slot.consultant_name)})}</b><p>${t('{day} at {time} (Italian time)',{day:callDayLabel(slot.starts_at),time:callTime(slot.starts_at)})}${local?' · '+esc(local):''}</p>${slot.consultant_phone?`<p>${t('Consultant’s phone: {phone}',{phone:phoneLink(slot.consultant_phone)})}</p>`:''}</div>`;
+ }
+ function thanks(message,booking=null,record=null){
+  rerender=()=>thanks(message,booking,record);
+  const extra=booking?.status==='booked'?bookingSummary(booking.slot)
+   :booking?.status==='taken'?`<p class="notice">${t('That time was just booked by someone else. Your check-in is saved. Choose another time or skip.')}</p><form id="rebook"><section class="booking" id="booking">${slotPicker()}</section><p class="error" role="alert"></p><div class="actions"><button type="submit" class="btn primary">${t('Book call')}</button><button type="button" class="btn" id="skip-call">${t('Skip')}</button></div></form><br>`
+   :'';
+  app.innerHTML=shell(t('Thanks for sharing'),t('Your response has been saved.'),`${extra}<p class="muted">${t(message?'Your Gobeyond team has received your message.':'Your Gobeyond team has received your check-in.')}</p><button id="another" class="btn primary">${t('Send another message')}</button> ${preview?`<a href="/?demo=1" class="btn">${t('Open sample workspace')}</a>`:''}`);
   document.querySelector('#another').onclick=()=>{submissionId=crypto.randomUUID();kind='message';form();};
+  const rebook=document.querySelector('#rebook');
+  if(!rebook)return;
+  rebook.addEventListener('change',event=>{if(event.target.name==='slot')chosenSlot=event.target.value;});
+  document.querySelector('#skip-call').onclick=()=>thanks(message,null,record);
+  rebook.onsubmit=async event=>{
+   event.preventDefault();
+   const button=rebook.querySelector('button[type=submit]');
+   const slotId=new FormData(rebook).get('slot');
+   try{
+    if(!slotId)throw new Error('Choose a time first.');
+    button.disabled=true;
+    const result=preview?demoBook(slotId,record):(await request('/api/book',{token,feedback_id:record.id,slot:slotId})).booking;
+    if(result.status!=='booked'){slotsState='idle';chosenSlot='';}
+    thanks(message,result,record);
+   }catch(error){showError(rebook,error);button.disabled=false;}
+  };
  }
  function form(values={}){
   const message=kind==='message';
@@ -524,6 +702,7 @@ async function formPage(){
    ${message?'':`<fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:9px">${t('How are you feeling this week?')}</legend><div class="choices">${faces.slice(1).map((face,i)=>`<label><input type="radio" name="mood" value="${i+1}" required><span><b aria-hidden="true">${face}</b>${t(moods[i+1])}</span></label>`).join('')}</div></fieldset>
    <fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:4px">${t('How are these things going?')}</legend><div class="areas">${areas.map(([key,label])=>`<div class="area-row" role="radiogroup" aria-label="${t(label)}"><span class="area-name">${t(label)}</span><div class="scale">${ratings.map(([value,text])=>`<label><input type="radio" name="${key}" value="${value}" required><span class="${value}">${t(text)}</span></label>`).join('')}</div></div>`).join('')}</div></fieldset>`}
    <fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:9px">${t('Do you need support from us with anything?')}</legend><div class="support-options">${needs.map(([value,label])=>`<label><input type="radio" name="need" value="${value}" required><span>${t(label)}</span></label>`).join('')}</div></fieldset>
+   ${message?'':'<section class="booking" id="booking" hidden></section>'}
    ${message?`<label class="field">${t('What is this about? (optional)')}<select name="topic"><option value="">${t('Choose a topic')}</option>${options(topics)}</select></label>`:''}
    <label class="field">${t(message?'What would you like to tell us?':'Anything else you’d like to tell us or ask? (optional)')}<textarea name="note" maxlength="2000" ${message?'required':''} placeholder="${t('A question, something that went well, or something you’d like help with')}"></textarea></label>
    <p class="muted">${t('Your Gobeyond support team can read your response.')}</p><p class="error" role="alert"></p>
@@ -534,23 +713,41 @@ async function formPage(){
   rerender=()=>form(Object.fromEntries(new FormData(element)));
   const toggle=document.querySelector('#switch-kind');
   if(toggle)toggle.onclick=()=>{kind=message?'check-in':'message';form();};
+  // Show the call booking only while "Yes, it's urgent" is selected.
+  const bookingBox=element.querySelector('#booking');
+  const syncBooking=()=>{
+   if(!bookingBox)return;
+   bookingBox.hidden=element.elements.need.value!=='urgent';
+   if(!bookingBox.hidden)bookingBox.innerHTML=slotPicker();
+  };
+  element.addEventListener('change',event=>{
+   if(event.target.name==='need')syncBooking();
+   if(event.target.name==='slot')chosenSlot=event.target.value;
+  });
+  syncBooking();
   element.onsubmit=async event=>{
    event.preventDefault();
    const button=element.querySelector('button[type=submit]');
    button.disabled=true;
    const input={...Object.fromEntries(new FormData(element)),kind,token,id:submissionId};
+   if(message||input.need!=='urgent'||!input.slot)delete input.slot;
    try{
     if(message&&!input.note.trim())throw new Error('Enter a message before sending.');
+    let booking=null;
+    const record={id:submissionId,name:'Sample submission',note:input.note||''};
     if(preview){
      const mock=readDemo();
-     const record={...input,topic:input.topic??'',id:submissionId,week:currentWeek,student_id:'preview',name:'Sample submission',destination:'Demo',mood:message?null:Number(input.mood),created_at:new Date().toISOString()};
-     record.priority=priorityFor(record);
-     record.status=record.priority==='routine'?'resolved':'open';
-     mock.feedback.unshift(record);
+     const stored={...input,topic:input.topic??'',id:submissionId,week:currentWeek,student_id:'preview',name:'Sample submission',destination:'Demo',mood:message?null:Number(input.mood),created_at:new Date().toISOString()};
+     delete stored.slot;
+     stored.priority=priorityFor(stored);
+     stored.status=stored.priority==='routine'?'resolved':'open';
+     mock.feedback.unshift(stored);
      saveDemo(mock);
-    }else await request('/api/submit',input);
+     if(input.slot)booking=demoBook(input.slot,record);
+    }else booking=(await request('/api/submit',input)).booking||null;
+    if(booking?.status==='taken'){slotsState='idle';chosenSlot='';}
     student.submitted ||= !message;
-    thanks(message);
+    thanks(message,booking,record);
    }catch(error){showError(element,error);button.disabled=false;}
   };
  }

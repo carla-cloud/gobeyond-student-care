@@ -32,8 +32,70 @@ const areasTableSql = `CREATE TABLE IF NOT EXISTS checkin_areas (
  feedback_id TEXT PRIMARY KEY REFERENCES feedback(id),
  studies TEXT NOT NULL, housing TEXT NOT NULL, social TEXT NOT NULL, health TEXT NOT NULL, money TEXT NOT NULL
 )`;
+// Consultant call calendar: same tables as drizzle/0002_consultant_calendar.sql.
+// A slot is 'open' (bookable), 'booked' (by a student from an urgent check-in) or 'cancelled' (by staff; never re-offered).
+const consultants = [['maria','Maria','+39 320 123 4567'],['francesco','Francesco','+39 331 234 5678'],['giorgia','Giorgia','+39 342 345 6789']];
+const calendarSql = [
+  'CREATE TABLE IF NOT EXISTS consultants (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL)',
+  `CREATE TABLE IF NOT EXISTS slots (
+ id TEXT PRIMARY KEY, consultant_id TEXT NOT NULL REFERENCES consultants(id),
+ starts_at TEXT NOT NULL, ends_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open',
+ student_id TEXT REFERENCES students(id), feedback_id TEXT REFERENCES feedback(id),
+ booked_at TEXT, cancelled_at TEXT
+)`,
+  "CREATE UNIQUE INDEX IF NOT EXISTS one_booking_per_checkin ON slots(feedback_id) WHERE status='booked'"
+];
+// Example availability (Italian time), created once when there are no slots yet.
+const exampleTimes = {maria:['09:30','14:00'],francesco:['11:00','16:00'],giorgia:['10:00','15:30']};
+const slotMinutes = 30;
+function italianTime(date,time) {
+  const [y,m,d]=date.split('-').map(Number), [h,mi]=time.split(':').map(Number);
+  const wanted=Date.UTC(y,m-1,d,h,mi);
+  let utc=wanted;
+  for (let i=0;i<2;i++) {
+    const p=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Rome',hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})
+      .formatToParts(new Date(utc)).map(part=>[part.type,part.value]));
+    utc+=wanted-Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute);
+  }
+  return new Date(utc).toISOString();
+}
+function exampleSlots(from) {
+  const days=[];
+  for (let date=shiftDay(from,1); days.length<3; date=shiftDay(date,1)) {
+    const weekday=new Date(date+'T12:00:00Z').getUTCDay();
+    if (weekday!==0 && weekday!==6) days.push(date);
+  }
+  return days.flatMap(date=>consultants.flatMap(([consultant])=>exampleTimes[consultant].map(time=>{
+    const starts=italianTime(date,time);
+    return {id:consultant+'-'+date+'-'+time.replace(':',''),consultant,starts,ends:new Date(Date.parse(starts)+slotMinutes*60000).toISOString()};
+  })));
+}
+async function setupSchema(db) {
+  for (const sql of [areasTableSql,...calendarSql]) await run(db,sql);
+  for (const [key,name,phone] of consultants) await run(db,'INSERT OR IGNORE INTO consultants (id,name,phone) VALUES (?,?,?)',key,name,phone);
+  if (await first(db,'SELECT 1 AS found FROM slots LIMIT 1')) return;
+  for (const slot of exampleSlots(today()))
+    await run(db,"INSERT OR IGNORE INTO slots (id,consultant_id,starts_at,ends_at,status) VALUES (?,?,?,?,'open')",slot.id,slot.consultant,slot.starts,slot.ends);
+}
 let schemaReady;
-const ensureSchema = db => schemaReady ??= run(db,areasTableSql).catch(error => { schemaReady = undefined; throw error; });
+const ensureSchema = db => schemaReady ??= setupSchema(db).catch(error => { schemaReady = undefined; throw error; });
+const slotSql = 'SELECT s.*,c.name AS consultant_name,c.phone AS consultant_phone FROM slots s JOIN consultants c ON c.id=s.consultant_id';
+const calendarRowsSql = `SELECT s.id,s.starts_at,s.ends_at,s.status,s.feedback_id,s.booked_at,s.cancelled_at,
+  c.name AS consultant_name,c.phone AS consultant_phone,st.name AS student_name,f.note
+  FROM slots s JOIN consultants c ON c.id=s.consultant_id LEFT JOIN students st ON st.id=s.student_id LEFT JOIN feedback f ON f.id=s.feedback_id
+  WHERE s.starts_at>=? ORDER BY s.starts_at,c.name`;
+const bookingInfo = s => ({id:s.id,starts_at:s.starts_at,ends_at:s.ends_at,consultant_name:s.consultant_name,consultant_phone:s.consultant_phone});
+// Books a future open slot for one urgent check-in. The conditional UPDATE means only one student can win a slot;
+// the one_booking_per_checkin index means a check-in can hold at most one booked slot.
+async function book(db,studentId,feedbackId,slotId) {
+  const current=await first(db,slotSql+" WHERE s.feedback_id=? AND s.status='booked'",feedbackId);
+  if (current) return {status:'booked',slot:bookingInfo(current)};
+  try {
+    await run(db,"UPDATE slots SET status='booked',student_id=?,feedback_id=?,booked_at=? WHERE id=? AND status='open' AND starts_at>?",studentId,feedbackId,now(),slotId,now());
+  } catch {}
+  const booked=await first(db,slotSql+" WHERE s.feedback_id=? AND s.status='booked'",feedbackId);
+  return booked ? {status:'booked',slot:bookingInfo(booked)} : {status:'taken'};
+}
 const validDate = value => /^\d{4}-\d\d-\d\d$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
 
 async function deliver(db,url,secret,event) {
@@ -75,7 +137,7 @@ async function api(request,env,ctx,url) {
   if (!db) return fail('The CRM database is unavailable.',503);
   await ensureSchema(db);
 
-  if (path==='/api/student' || path==='/api/submit') {
+  if (path==='/api/student' || path==='/api/submit' || path==='/api/slots' || path==='/api/book') {
     if (method!=='POST') return fail('Method unavailable.',405);
     const input = await request.json();
     const token = text(input.token);
@@ -85,6 +147,13 @@ async function api(request,env,ctx,url) {
     if (student.start_date>day || student.end_date<day) return fail('This check-in link is outside your program dates.',409);
     const existing=await first(db,"SELECT id FROM feedback WHERE student_id=? AND week=? AND kind='check-in'",student.id,week);
     if (path==='/api/student') return json({name:student.name,week,submitted:!!existing});
+    if (path==='/api/slots') return json({slots:await all(db,`SELECT s.id,s.starts_at,s.ends_at,c.name AS consultant_name
+      FROM slots s JOIN consultants c ON c.id=s.consultant_id WHERE s.status='open' AND s.starts_at>? ORDER BY s.starts_at,c.name LIMIT 60`,now())});
+    if (path==='/api/book') {
+      const checkIn=await first(db,"SELECT id FROM feedback WHERE id=? AND student_id=? AND kind='check-in' AND need='urgent' AND week=?",text(input.feedback_id),student.id,week);
+      if (!checkIn) return fail('Calls can only be booked from an urgent check-in this week.',403);
+      return json({booking:await book(db,student.id,checkIn.id,text(input.slot))});
+    }
     const kind=input.kind, mood=Number(input.mood), need=input.need, topic=text(input.topic), note=text(input.note);
     const answers=areaKeys.map(key=>input[key]);
     if (!['check-in','message'].includes(kind) || !needs.includes(need) || (topic && !topics.includes(topic)) ||
@@ -107,7 +176,10 @@ async function api(request,env,ctx,url) {
     const record=await first(db,recordSql+' WHERE f.id=?',submissionId);
     if (result.meta.changes && env.SHEET_WEBHOOK_URL && env.WEBHOOK_SECRET)
       ctx.waitUntil(deliver(db,env.SHEET_WEBHOOK_URL,env.WEBHOOK_SECRET,feedbackEvent(record)).catch(()=>{}));
-    return json({saved:true,priority:record.priority});
+    // Optional call booking: only from an urgent weekly check-in that picked a slot.
+    const booking = kind==='check-in' && need==='urgent' && saved.kind==='check-in' && text(input.slot)
+      ? await book(db,student.id,submissionId,text(input.slot)) : null;
+    return json({saved:true,priority:record.priority,booking});
   }
 
   if (path==='/api/jobs' && method==='POST' && (staff||automation)) {
@@ -145,11 +217,11 @@ async function api(request,env,ctx,url) {
   if (!staff) return fail(signedIn ? 'Staff access is required.' : 'Sign in to open the staff workspace.',signedIn ? 403 : 401);
 
   if (path==='/api/data' && method==='GET') {
-    const [students,feedback]=await Promise.all([all(db,rosterSql),all(db,rowsSql)]);
+    const [students,feedback,slots]=await Promise.all([all(db,rosterSql),all(db,rowsSql),all(db,calendarRowsSql,new Date(Date.now()-2*86400000).toISOString())]);
     const sheetUrl = typeof env.GOOGLE_SHEET_URL === 'string' &&
       /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[A-Za-z0-9_-]+\/edit$/.test(env.GOOGLE_SHEET_URL)
       ? env.GOOGLE_SHEET_URL : null;
-    return json({students,feedback,day,week,integrations:{
+    return json({students,feedback,slots,day,week,integrations:{
       sheet:!!(env.SHEET_WEBHOOK_URL&&env.WEBHOOK_SECRET), sheetUrl,
       reminder:!!(env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET),
       reminderScheduled:env.WEEKLY_EMAIL_SCHEDULE==='daily'}});
@@ -168,6 +240,11 @@ async function api(request,env,ctx,url) {
     if (!statuses.includes(input.status)||typeof input.id!=='string') return fail('Choose a valid status.');
     const result=await run(db,'UPDATE feedback SET status=? WHERE id=?',input.status,input.id);
     return result.meta.changes ? json({saved:true}) : fail('The feedback record was not found.',404);
+  }
+  if (path==='/api/appointments/cancel' && method==='POST') {
+    const input=await request.json();
+    const result=await run(db,"UPDATE slots SET status='cancelled',cancelled_at=? WHERE id=? AND status='booked'",now(),text(input.id));
+    return result.meta.changes ? json({saved:true}) : fail('The appointment was not found or is already cancelled.',404);
   }
   return fail('This page does not exist.',404);
 }
