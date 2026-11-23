@@ -51,8 +51,6 @@ const IT={
  'routine':'ordinario',
  'check-in':'check-in',
  'message':'messaggio',
- 'none':'no',
- 'soon':'quando possibile',
  // Overview
  'Student care overview':'Panoramica assistenza studenti',
  'Track weekly feedback and follow up with students abroad.':'Monitora i feedback settimanali e segui gli studenti all’estero.',
@@ -77,6 +75,8 @@ const IT={
  'View all':'Vedi tutti',
  'Students who may need help':'Studenti che potrebbero aver bisogno di aiuto',
  'Requested support':'Ha richiesto supporto',
+ 'Contact this week':'Da contattare questa settimana',
+ 'Difficult: {areas}':'Difficoltà: {areas}',
  'No open follow-ups.':'Nessun follow-up aperto.',
  // Tables
  'Student':'Studente',
@@ -110,8 +110,8 @@ const IT={
  // Settings
  'Manage weekly delivery and spreadsheet syncing.':'Gestisci l’invio settimanale e la sincronizzazione del foglio di calcolo.',
  'Weekly reminders':'Promemoria settimanali',
- 'The email automation checks daily for active students. Each student who has yet to respond is eligible for one email per week. Their personal link opens without an account.':'L’automazione email controlla ogni giorno gli studenti attivi. Ogni studente che non ha ancora risposto può ricevere un’email a settimana. Il suo link personale si apre senza account.',
- 'Active students who have yet to respond are eligible for at most one reminder per week.':'Gli studenti attivi che non hanno ancora risposto ricevono al massimo un promemoria a settimana.',
+ 'The email automation checks daily for active students. Each student who has yet to check in gets one email per week, and a reminder four days later if they still haven’t replied. Their personal link opens without an account.':'L’automazione email controlla ogni giorno gli studenti attivi. Ogni studente che non ha ancora fatto il check-in riceve un’email a settimana e, se dopo quattro giorni non ha ancora risposto, un promemoria. Il suo link personale si apre senza account.',
+ 'Active students who have yet to check in get one email per week, and a reminder four days later if they still haven’t replied.':'Gli studenti attivi che non hanno ancora fatto il check-in ricevono un’email a settimana e, se dopo quattro giorni non hanno ancora risposto, un promemoria.',
  'Daily check scheduled':'Controllo giornaliero programmato',
  'Webhook configured':'Webhook configurato',
  'Connection required':'Connessione richiesta',
@@ -138,8 +138,9 @@ const IT={
  'No written comment.':'Nessun commento scritto.',
  'Support requested:':'Supporto richiesto:',
  'No':'No',
- 'As soon as possible':'Il prima possibile',
- 'Yes, when available':'Sì, quando possibile',
+ 'Yes, not urgent':'Sì, non urgente',
+ 'Yes, this week':'Sì, questa settimana',
+ 'Yes, urgent':'Sì, urgente',
  'Follow-up status':'Stato del follow-up',
  'Save status':'Salva stato',
  'Add a student':'Aggiungi uno studente',
@@ -168,13 +169,22 @@ const IT={
  'Back to weekly check-in':'Torna al check-in settimanale',
  'Send a separate message':'Invia un messaggio separato',
  'How are you feeling this week?':'Come ti senti questa settimana?',
- 'Would you like support?':'Vorresti ricevere supporto?',
- 'No, thank you':'No, grazie',
- 'Yes, as soon as possible':'Sì, il prima possibile',
+ 'How are these things going?':'Come stanno andando queste cose?',
+ 'Studies':'Studio',
+ 'Housing / host family':'Alloggio / famiglia ospitante',
+ 'Social life & friends':'Vita sociale e amici',
+ 'Health & wellbeing':'Salute e benessere',
+ 'Money':'Soldi',
+ 'Difficult':'Difficile',
+ 'Do you need support from us with anything?':'Hai bisogno del nostro supporto per qualcosa?',
+ 'No, all good':'No, tutto bene',
+ 'Yes, but it’s not urgent':'Sì, ma non è urgente',
+ 'Yes, please contact me this week':'Sì, contattatemi questa settimana',
+ 'Yes, it’s urgent':'Sì, è urgente',
  'What is this about? (optional)':'Di cosa si tratta? (facoltativo)',
  'Choose a topic':'Scegli un argomento',
  'What would you like to tell us?':'Cosa vorresti dirci?',
- 'Anything else you want to share? (optional)':'C’è altro che vuoi condividere? (facoltativo)',
+ 'Anything else you’d like to tell us or ask? (optional)':'C’è altro che vuoi dirci o chiederci? (facoltativo)',
  'A question, something that went well, or something you’d like help with':'Una domanda, qualcosa che è andato bene o qualcosa per cui ti serve aiuto',
  'Your Gobeyond support team can read your response.':'Il tuo team di supporto Gobeyond può leggere la tua risposta.',
  'Send message':'Invia messaggio',
@@ -239,6 +249,20 @@ const moods=['','Struggling','Low','Okay','Good','Great'];
 const faces=['','😟','🙁','😐','🙂','😄'];
 const topics=['School','Host family or accommodation','Friends and settling in','Wellbeing','Travel or logistics','Other'];
 const statuses=['open','in progress','resolved'];
+// Weekly check-in: "How are these things going?" areas and their answers.
+const areas=[['studies','Studies'],['housing','Housing / host family'],['social','Social life & friends'],['health','Health & wellbeing'],['money','Money']];
+const ratings=[['good','Good'],['ok','OK'],['difficult','Difficult']];
+// "Do you need support from us?" answers (stored value, question wording).
+const needs=[['none','No, all good'],['soon','Yes, but it’s not urgent'],['week','Yes, please contact me this week'],['urgent','Yes, it’s urgent']];
+const needLabel=need=>t({none:'No',soon:'Yes, not urgent',week:'Yes, this week',urgent:'Yes, urgent'}[need]??need);
+const ratingLabel=value=>t(ratings.find(([key])=>key===value)?.[1]??value);
+const ratingClass=value=>value==='good'?'resolved':value==='difficult'?'follow':'';
+const areaSummary=r=>{
+ const hard=areas.filter(([key])=>r[key]==='difficult').map(([,label])=>t(label));
+ return hard.length?t('Difficult: {areas}',{areas:hard.join(', ')}):'';
+};
+// Same rules as the server: urgent request -> urgent; any request, message, low mood or a "Difficult" area -> follow-up.
+const priorityFor=r=>r.need==='urgent'?'urgent':r.need!=='none'||r.kind==='message'||Number(r.mood)<=2||areas.some(([key])=>r[key]==='difficult')?'follow':'routine';
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const capital=value=>value.charAt(0).toUpperCase()+value.slice(1);
 const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -248,24 +272,28 @@ d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);
 const currentWeek=d.toISOString().slice(0,10);
 const weekEnd=new Date(d.getTime()+6*86400000).toISOString().slice(0,10);
 const dateAfter=offset=>new Date(Date.parse(day+'T12:00:00Z')+offset*86400000).toISOString().slice(0,10);
+// Sample check-ins: name, destination, mood, support, area answers (studies,housing,social,health,money), comment.
 const examples=[
- ['Sofia Rossi','Toronto, Canada',2,'soon','Host family or accommodation','I’m finding it hard to settle into the host family’s routine. Could we talk?'],
- ['Luca Bianchi','Dublin, Ireland',4,'none','School','My classes are going well and I joined the football team.'],
- ['Giulia Romano','Brighton, UK',1,'urgent','Wellbeing','I’m having a tough week and would like to speak to my coordinator.'],
- ['Emma Conti','Vancouver, Canada',5,'none','Friends and settling in','I made new friends on a school trip.'],
- ['Matteo Ricci','Auckland, New Zealand',3,'soon','School','Can you help me understand how to change one of my classes?'],
- ['Alice Marino','Boston, USA',4,'none','Other','I’m feeling a lot more at home this week.'],
+ ['Sofia Rossi','Toronto, Canada',2,'soon','ok,difficult,ok,good,good','I’m finding it hard to settle into the host family’s routine. Could we talk?'],
+ ['Luca Bianchi','Dublin, Ireland',4,'none','good,good,good,good,ok','My classes are going well and I joined the football team.'],
+ ['Giulia Romano','Brighton, UK',1,'urgent','ok,ok,difficult,difficult,ok','I’m having a tough week and would like to speak to my coordinator.'],
+ ['Emma Conti','Vancouver, Canada',5,'none','good,good,good,good,good','I made new friends on a school trip.'],
+ ['Matteo Ricci','Auckland, New Zealand',3,'week','difficult,good,ok,good,ok','Can you help me understand how to change one of my classes?'],
+ ['Alice Marino','Boston, USA',4,'none','good,good,good,ok,ok','I’m feeling a lot more at home this week.'],
  ['Leonardo Costa','Oxford, UK'],['Beatrice Gallo','Ottawa, Canada']
 ];
 const exampleData=()=>({
  students:examples.map(([name,destination],i)=>({id:'sample-'+i,name,destination,email:'student'+i+'@example.com',start_date:dateAfter(-60),end_date:dateAfter(90)})),
- feedback:examples.slice(0,6).map(([name,destination,mood,need,topic,note],i)=>({
-  id:'demo-'+i,student_id:'sample-'+i,name,destination,kind:'check-in',week:currentWeek,mood,need,topic,note,
-  priority:need==='urgent'?'urgent':need==='soon'?'follow':'routine',status:i===4?'in progress':need==='none'?'resolved':'open',
-  created_at:new Date(Date.now()-i*7200000).toISOString()
- })),day,week:currentWeek,integrations:{sheet:false,reminder:false}
+ feedback:examples.slice(0,6).map(([name,destination,mood,need,answers,note],i)=>{
+  const record={id:'demo-'+i,student_id:'sample-'+i,name,destination,kind:'check-in',week:currentWeek,mood,need,topic:'',note,
+   created_at:new Date(Date.now()-i*7200000).toISOString()};
+  answers.split(',').forEach((value,j)=>{record[areas[j][0]]=value;});
+  record.priority=priorityFor(record);
+  record.status=i===4?'in progress':record.priority==='routine'?'resolved':'open';
+  return record;
+ }),day,week:currentWeek,integrations:{sheet:false,reminder:false}
 });
-const demoKey='gobeyond-demo-v1';
+const demoKey='gobeyond-demo-v2';
 function readDemo(){
  try {const data=JSON.parse(localStorage.getItem(demoKey));if(data?.week===currentWeek) return data;}catch{}
  return exampleData();
@@ -291,7 +319,9 @@ const views=[['overview','Overview'],['feedback','Feedback'],['students','Studen
 let data,view='overview',demo=false,search='',filter='all';
 const active=()=>data.students.filter(s=>s.start_date<=data.day&&s.end_date>=data.day);
 const current=()=>data.feedback.filter(r=>r.week===data.week&&r.kind==='check-in');
-const queue=()=>data.feedback.filter(r=>r.priority!=='routine'&&r.status!=='resolved').sort((a,b)=>Number(b.priority==='urgent')-Number(a.priority==='urgent')||b.created_at.localeCompare(a.created_at));
+const queue=()=>data.feedback.filter(r=>r.priority!=='routine'&&r.status!=='resolved').sort((a,b)=>Number(b.priority==='urgent')-Number(a.priority==='urgent')||Number(b.need==='week')-Number(a.need==='week')||b.created_at.localeCompare(a.created_at));
+// Short reason a response is in the support queue, e.g. "Contact this week · Difficult: Money".
+const queueReason=r=>[r.need==='week'?t('Contact this week'):'',areaSummary(r),r.topic?t(r.topic):''].filter(Boolean).join(' · ')||r.note||t('Requested support');
 const waiting=()=>active().filter(s=>!current().some(r=>r.student_id===s.id));
 const person=r=>`<div class="person">${avatar(r.name)}<div><b>${esc(r.name)}</b><small>${esc(r.destination)}</small></div></div>`;
 const rowButton=r=>`<button class="row-link" data-record="${esc(r.id)}">${t('View')}</button>`;
@@ -304,7 +334,7 @@ const externalSheetLink=()=>data.integrations.sheetUrl
 const table=(head,rows,empty='No records to show.')=>rows.length?`<div class="table-wrap"><table><thead><tr>${head.map(h=>'<th>'+t(h)+'</th>').join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`:`<p class="empty">${t(empty)}</p>`;
 const moodLabel=r=>r.mood?faces[r.mood]+' '+t(moods[r.mood]):'—';
 const feedbackTable=(rows,full=false)=>table(full?['Student','Week of','Type','Mood','Topic','Status','']:['Student','Mood','Status',''],
- rows.map(r=>`<tr><td>${person(r)}</td>${full?`<td>${dateLabel(r.week)}</td><td>${t(r.kind==='message'?'Message':'Check-in')}</td>`:''}<td>${moodLabel(r)}</td>${full?`<td>${esc(t(r.topic))||'—'}</td>`:''}<td>${pill(r)}</td><td>${rowButton(r)}</td></tr>`),'Feedback appears here as students submit check-ins and messages.');
+ rows.map(r=>`<tr><td>${person(r)}</td>${full?`<td>${dateLabel(r.week)}</td><td>${t(r.kind==='message'?'Message':'Check-in')}</td>`:''}<td>${moodLabel(r)}</td>${full?`<td>${esc(r.topic?t(r.topic):areaSummary(r))||'—'}</td>`:''}<td>${pill(r)}</td><td>${rowButton(r)}</td></tr>`),'Feedback appears here as students submit check-ins and messages.');
 
 function overview(){
  const count=active().length;
@@ -322,7 +352,7 @@ function overview(){
  </section>
  <section class="grid">
  <div class="card"><div class="card-head"><div><h2>${t('Recent feedback')}</h2><p>${t('Latest check-ins and messages')}</p></div>${btn('View all','feedback')}</div>${feedbackTable(data.feedback.slice(0,5))}</div>
- <div class="card"><div class="card-head"><div><h2>${t('Support queue')}</h2><p>${t('Students who may need help')}</p></div></div><div class="queue">${open.length?open.slice(0,5).map(r=>`<button class="queue-item" data-record="${esc(r.id)}">${avatar(r.name)}<span class="copy"><b>${esc(r.name)}</b><small>${esc(r.topic?t(r.topic):r.note||t('Requested support'))}</small></span>${pill(r)}</button>`).join(''):`<p class="empty">${t('No open follow-ups.')}</p>`}</div></div>
+ <div class="card"><div class="card-head"><div><h2>${t('Support queue')}</h2><p>${t('Students who may need help')}</p></div></div><div class="queue">${open.length?open.slice(0,5).map(r=>`<button class="queue-item" data-record="${esc(r.id)}">${avatar(r.name)}<span class="copy"><b>${esc(r.name)}</b><small>${esc(queueReason(r))}</small></span>${pill(r)}</button>`).join(''):`<p class="empty">${t('No open follow-ups.')}</p>`}</div></div>
  </section>`;
 }
 function dataView(){
@@ -336,8 +366,8 @@ function dataView(){
  if(view==='settings'){
   const {reminderScheduled,reminder,sheet}=data.integrations;
   const reminderCopy=reminderScheduled
-   ? 'The email automation checks daily for active students. Each student who has yet to respond is eligible for one email per week. Their personal link opens without an account.'
-   : 'Active students who have yet to respond are eligible for at most one reminder per week.';
+   ? 'The email automation checks daily for active students. Each student who has yet to check in gets one email per week, and a reminder four days later if they still haven’t replied. Their personal link opens without an account.'
+   : 'Active students who have yet to check in get one email per week, and a reminder four days later if they still haven’t replied.';
   const reminderStatus=reminderScheduled?'Daily check scheduled':reminder?'Webhook configured':'Connection required';
   const sheetAction=externalSheetLink()||`<span class="pill">${t(sheet?'Webhook configured':'Connection required')}</span>`;
   return title('Settings','Manage weekly delivery and spreadsheet syncing.')+`
@@ -363,8 +393,8 @@ function filterRows(){
  if(!result)return;
  const rows=(view==='support'?queue():data.feedback).filter(r=>
   (filter==='all'||r.kind===filter||r.priority===filter)&&
-  [r.name,r.destination,r.topic,t(r.topic),r.note].join(' ').toLowerCase().includes(search.toLowerCase()));
- result.innerHTML=view==='sheet'?table(['Submitted','Week of','Student','Destination','Type','Mood','Support','Topic','Feedback','Status',''],rows.map(r=>`<tr><td>${dateLabel(r.created_at)}</td><td>${dateLabel(r.week)}</td><td>${esc(r.name)}</td><td>${esc(r.destination)}</td><td>${esc(t(r.kind))}</td><td>${r.mood??'—'}</td><td>${esc(t(r.need))}</td><td>${esc(t(r.topic))||'—'}</td><td style="max-width:280px;white-space:normal">${esc(r.note)||'—'}</td><td>${pill(r)}</td><td>${rowButton(r)}</td></tr>`)):feedbackTable(rows,true);
+  [r.name,r.destination,r.topic,t(r.topic),areaSummary(r),r.note].join(' ').toLowerCase().includes(search.toLowerCase()));
+ result.innerHTML=view==='sheet'?table(['Submitted','Week of','Student','Destination','Type','Mood',...areas.map(([,label])=>label),'Support','Topic','Feedback','Status',''],rows.map(r=>`<tr><td>${dateLabel(r.created_at)}</td><td>${dateLabel(r.week)}</td><td>${esc(r.name)}</td><td>${esc(r.destination)}</td><td>${esc(t(r.kind))}</td><td>${r.mood??'—'}</td>${areas.map(([key])=>`<td>${r[key]?`<span class="pill ${ratingClass(r[key])}">${esc(ratingLabel(r[key]))}</span>`:'—'}</td>`).join('')}<td>${esc(needLabel(r.need))}</td><td>${esc(t(r.topic))||'—'}</td><td style="max-width:280px;white-space:normal">${esc(r.note)||'—'}</td><td>${pill(r)}</td><td>${rowButton(r)}</td></tr>`)):feedbackTable(rows,true);
 }
 function render(){
  rerender=render;
@@ -388,11 +418,12 @@ function openDialog(title,body){
  detail.showModal();
 }
 function recordDialog(record){
- const support=record.need==='none'?'No':record.need==='urgent'?'As soon as possible':'Yes, when available';
+ const areaRows=areas.filter(([key])=>record[key]).map(([key,label])=>`<li><span>${t(label)}</span><span class="pill ${ratingClass(record[key])}">${esc(ratingLabel(record[key]))}</span></li>`).join('');
  openDialog(esc(record.name),`<p class="sub">${esc(record.destination)} · ${t('Week of {date}',{date:dateLabel(record.week)})} · ${t(record.kind==='message'?'Message':'Check-in')}</p>
  <p style="margin:14px 0">${pill(record)} ${record.mood?faces[record.mood]+' '+t(moods[record.mood]):''}</p>
+ ${areaRows?`<ul class="area-list" aria-label="${t('How are these things going?')}">${areaRows}</ul>`:''}
  <strong>${esc(record.topic?t(record.topic):t('Student feedback'))}</strong><p class="record-text">${esc(record.note)||t('No written comment.')}</p>
- <p class="footnote">${t('Support requested:')} ${esc(t(support))}</p><br>
+ <p class="footnote">${t('Support requested:')} ${esc(needLabel(record.need))}</p><br>
  <form><label class="field">${t('Follow-up status')}<select name="status">${options(statuses)}</select></label><p class="error" role="alert"></p><button class="btn primary">${t('Save status')}</button></form>`);
  const form=detail.querySelector('form');
  form.elements.status.value=record.status;
@@ -423,14 +454,16 @@ function addDialog(){
  };
 }
 function download(){
- const cols=[['Submitted','created_at'],['Week of','week'],['Student','name'],['Destination','destination'],['Type','kind'],['Mood','mood'],['Support','need'],['Topic','topic'],['Feedback','note'],['Priority','priority'],['Status','status']];
- const translated=new Set(['kind','need','topic','priority','status']);
+ const cols=[['Submitted','created_at'],['Week of','week'],['Student','name'],['Destination','destination'],['Type','kind'],['Mood','mood'],...areas.map(([key,label])=>[label,key]),['Support','need'],['Topic','topic'],['Feedback','note'],['Priority','priority'],['Status','status']];
+ const translated=new Set(['kind','topic','priority','status']);
+ const areaKeys=new Set(areas.map(([key])=>key));
+ const value=(r,key)=>key==='need'?needLabel(r.need):areaKeys.has(key)?(r[key]?ratingLabel(r[key]):''):translated.has(key)?t(r[key]):r[key];
  const cell=value=>{
   let raw=String(value??'');
   if(/^[\s]*[=+@-]|^[\t\r\n]/.test(raw))raw="'"+raw;
   return '"'+raw.replaceAll('"','""')+'"';
  };
- const csv=[cols.map(c=>cell(t(c[0]))).join(','),...data.feedback.map(r=>cols.map(c=>cell(translated.has(c[1])?t(r[c[1]]):r[c[1]])).join(','))].join('\r\n');
+ const csv=[cols.map(c=>cell(t(c[0]))).join(','),...data.feedback.map(r=>cols.map(c=>cell(value(r,c[1]))).join(','))].join('\r\n');
  const url=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
  const a=document.createElement('a');a.href=url;a.download='gobeyond-feedback-'+data.day+'.csv';a.click();
  setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -488,10 +521,11 @@ async function formPage(){
    ${student.submitted?`<p class="notice">${t('Your check-in for this week is saved. You can still send a message.')}</p>`:''}
    <div class="actions" style="margin-bottom:17px">${student.submitted?'':`<button class="btn" id="switch-kind">${t(message?'Back to weekly check-in':'Send a separate message')}</button>`}</div>
    <form>
-   ${message?'':`<fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:9px">${t('How are you feeling this week?')}</legend><div class="choices">${faces.slice(1).map((face,i)=>`<label><input type="radio" name="mood" value="${i+1}" required><span><b aria-hidden="true">${face}</b>${t(moods[i+1])}</span></label>`).join('')}</div></fieldset>`}
-   <label class="field">${t('Would you like support?')}<select name="need" required><option value="none">${t('No, thank you')}</option><option value="soon">${t('Yes, when available')}</option><option value="urgent">${t('Yes, as soon as possible')}</option></select></label>
-   <label class="field">${t('What is this about? (optional)')}<select name="topic"><option value="">${t('Choose a topic')}</option>${options(topics)}</select></label>
-   <label class="field">${t(message?'What would you like to tell us?':'Anything else you want to share? (optional)')}<textarea name="note" maxlength="2000" ${message?'required':''} placeholder="${t('A question, something that went well, or something you’d like help with')}"></textarea></label>
+   ${message?'':`<fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:9px">${t('How are you feeling this week?')}</legend><div class="choices">${faces.slice(1).map((face,i)=>`<label><input type="radio" name="mood" value="${i+1}" required><span><b aria-hidden="true">${face}</b>${t(moods[i+1])}</span></label>`).join('')}</div></fieldset>
+   <fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:4px">${t('How are these things going?')}</legend><div class="areas">${areas.map(([key,label])=>`<div class="area-row" role="radiogroup" aria-label="${t(label)}"><span class="area-name">${t(label)}</span><div class="scale">${ratings.map(([value,text])=>`<label><input type="radio" name="${key}" value="${value}" required><span class="${value}">${t(text)}</span></label>`).join('')}</div></div>`).join('')}</div></fieldset>`}
+   <fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:9px">${t('Do you need support from us with anything?')}</legend><div class="support-options">${needs.map(([value,label])=>`<label><input type="radio" name="need" value="${value}" required><span>${t(label)}</span></label>`).join('')}</div></fieldset>
+   ${message?`<label class="field">${t('What is this about? (optional)')}<select name="topic"><option value="">${t('Choose a topic')}</option>${options(topics)}</select></label>`:''}
+   <label class="field">${t(message?'What would you like to tell us?':'Anything else you’d like to tell us or ask? (optional)')}<textarea name="note" maxlength="2000" ${message?'required':''} placeholder="${t('A question, something that went well, or something you’d like help with')}"></textarea></label>
    <p class="muted">${t('Your Gobeyond support team can read your response.')}</p><p class="error" role="alert"></p>
    <button type="submit" class="btn primary">${t(message?'Send message':'Submit check-in')}</button></form>`);
   const element=app.querySelector('form');
@@ -508,8 +542,11 @@ async function formPage(){
    try{
     if(message&&!input.note.trim())throw new Error('Enter a message before sending.');
     if(preview){
-     const mock=readDemo(), priority=input.need==='urgent'?'urgent':input.need==='soon'||message||Number(input.mood)<=2?'follow':'routine';
-     mock.feedback.unshift({...input,id:submissionId,week:currentWeek,student_id:'preview',name:'Sample submission',destination:'Demo',mood:message?null:Number(input.mood),priority,status:priority==='routine'?'resolved':'open',created_at:new Date().toISOString()});
+     const mock=readDemo();
+     const record={...input,topic:input.topic??'',id:submissionId,week:currentWeek,student_id:'preview',name:'Sample submission',destination:'Demo',mood:message?null:Number(input.mood),created_at:new Date().toISOString()};
+     record.priority=priorityFor(record);
+     record.status=record.priority==='routine'?'resolved':'open';
+     mock.feedback.unshift(record);
      saveDemo(mock);
     }else await request('/api/submit',input);
     student.submitted ||= !message;

@@ -1,11 +1,17 @@
 import { assets } from './assets.mjs';
 
 const topics = ['School', 'Host family or accommodation', 'Friends and settling in', 'Wellbeing', 'Travel or logistics', 'Other'];
-const needs = ['none','soon','urgent'];
+const needs = ['none','soon','week','urgent'];
+const areaKeys = ['studies','housing','social','health','money'];
+const ratings = ['good','ok','difficult'];
 const statuses = ['open','in progress','resolved'];
 const id = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
-const today = () => new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const madridDay = date => new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
+const today = () => madridDay(new Date());
+const shiftDay = (date,days) => new Date(Date.parse(date+'T12:00:00Z')+days*86400000).toISOString().slice(0,10);
+// A student who still has not checked in gets a second email this many days after the first one.
+const reminderFollowUpDays = 4;
 function weekOf(date) {
   const d = new Date(date + 'T00:00:00Z');
   d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7);
@@ -16,10 +22,18 @@ const headers = {'cache-control':'no-store','referrer-policy':'no-referrer','x-c
 const json = (body,status=200) => Response.json(body,{status,headers});
 const fail = (error,status=400) => json({error},status);
 const rosterSql = 'SELECT id,name,email,destination,start_date,end_date,token FROM students ORDER BY name';
-const rowsSql = 'SELECT f.*,s.name,s.destination FROM feedback f JOIN students s ON s.id=f.student_id ORDER BY created_at DESC';
+const recordSql = 'SELECT f.*,s.name,s.destination,a.studies,a.housing,a.social,a.health,a.money FROM feedback f JOIN students s ON s.id=f.student_id LEFT JOIN checkin_areas a ON a.feedback_id=f.id';
+const rowsSql = recordSql+' ORDER BY f.created_at DESC';
 const all = async (db,sql,...args) => (await db.prepare(sql).bind(...args).all()).results;
 const first = (db,sql,...args) => db.prepare(sql).bind(...args).first();
 const run = (db,sql,...args) => db.prepare(sql).bind(...args).run();
+// Same table as drizzle/0001_checkin_areas.sql, created here too so the app works even if that migration has not run yet.
+const areasTableSql = `CREATE TABLE IF NOT EXISTS checkin_areas (
+ feedback_id TEXT PRIMARY KEY REFERENCES feedback(id),
+ studies TEXT NOT NULL, housing TEXT NOT NULL, social TEXT NOT NULL, health TEXT NOT NULL, money TEXT NOT NULL
+)`;
+let schemaReady;
+const ensureSchema = db => schemaReady ??= run(db,areasTableSql).catch(error => { schemaReady = undefined; throw error; });
 const validDate = value => /^\d{4}-\d\d-\d\d$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
 
 async function deliver(db,url,secret,event) {
@@ -59,6 +73,7 @@ async function api(request,env,ctx,url) {
 
   if (path==='/api/demo') return fail('Demo data is handled in the browser.',404);
   if (!db) return fail('The CRM database is unavailable.',503);
+  await ensureSchema(db);
 
   if (path==='/api/student' || path==='/api/submit') {
     if (method!=='POST') return fail('Method unavailable.',405);
@@ -71,18 +86,25 @@ async function api(request,env,ctx,url) {
     const existing=await first(db,"SELECT id FROM feedback WHERE student_id=? AND week=? AND kind='check-in'",student.id,week);
     if (path==='/api/student') return json({name:student.name,week,submitted:!!existing});
     const kind=input.kind, mood=Number(input.mood), need=input.need, topic=text(input.topic), note=text(input.note);
+    const answers=areaKeys.map(key=>input[key]);
     if (!['check-in','message'].includes(kind) || !needs.includes(need) || (topic && !topics.includes(topic)) ||
         note.length>2000 || (kind==='check-in' && (!Number.isInteger(mood)||mood<1||mood>5)) ||
+        (kind==='check-in' && !answers.every(value=>ratings.includes(value))) ||
         (kind==='message' && !note)) return fail('Please complete the required fields.');
     if (kind==='check-in' && existing) return fail('Your check-in for this week is already saved.',409);
     const submissionId=text(input.id);
     if (!/^[0-9a-f-]{36}$/i.test(submissionId)) return fail('Reload the form and try again.');
-    const priority = need==='urgent' ? 'urgent' : need==='soon'||kind==='message'||mood<=2 ? 'follow' : 'routine';
+    // Urgent request -> urgent; any other request, a message, low mood or a "Difficult" area -> follow-up.
+    const difficult = kind==='check-in' && answers.includes('difficult');
+    const priority = need==='urgent' ? 'urgent' : need!=='none'||kind==='message'||mood<=2||difficult ? 'follow' : 'routine';
     const result=await run(db,`INSERT OR IGNORE INTO feedback
       (id,student_id,week,kind,mood,need,topic,note,priority,status,created_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,submissionId,student.id,week,kind,kind==='message'?null:mood,need,topic,note,priority,priority==='routine'?'resolved':'open',now());
-    const record=await first(db,'SELECT f.*,s.name,s.destination FROM feedback f JOIN students s ON s.id=f.student_id WHERE f.id=? AND f.student_id=?',submissionId,student.id);
-    if (!record) return fail('A check-in for this week already exists. Reload to send a separate message.',409);
+    const saved=await first(db,'SELECT kind FROM feedback WHERE id=? AND student_id=?',submissionId,student.id);
+    if (!saved) return fail('A check-in for this week already exists. Reload to send a separate message.',409);
+    if (saved.kind==='check-in' && kind==='check-in')
+      await run(db,'INSERT OR IGNORE INTO checkin_areas (feedback_id,studies,housing,social,health,money) VALUES (?,?,?,?,?,?)',submissionId,...answers);
+    const record=await first(db,recordSql+' WHERE f.id=?',submissionId);
     if (result.meta.changes && env.SHEET_WEBHOOK_URL && env.WEBHOOK_SECRET)
       ctx.waitUntil(deliver(db,env.SHEET_WEBHOOK_URL,env.WEBHOOK_SECRET,feedbackEvent(record)).catch(()=>{}));
     return json({saved:true,priority:record.priority});
@@ -93,13 +115,25 @@ async function api(request,env,ctx,url) {
     const eligible=await all(db,`SELECT s.* FROM students s WHERE start_date<=? AND end_date>=?
       AND NOT EXISTS(SELECT 1 FROM feedback f WHERE f.student_id=s.id AND f.kind='check-in' AND f.week=?)
       AND NOT EXISTS(SELECT 1 FROM delivery d WHERE d.id='reminder:'||s.id||':'||? AND d.state='sent') LIMIT 25`,day,day,week,week);
-    const pending=await all(db,`SELECT f.*,s.name,s.destination FROM feedback f JOIN students s ON s.id=f.student_id
+    // Second email: the first one for this week went out at least 4 calendar days ago (Madrid time)
+    // and the student still has not checked in. Sent at most once per student per week.
+    const followUpBefore=shiftDay(day,-reminderFollowUpDays);
+    const followUps=(await all(db,`SELECT s.*,d.updated_at AS first_sent FROM students s
+      JOIN delivery d ON d.id='reminder:'||s.id||':'||? AND d.state='sent'
+      WHERE s.start_date<=? AND s.end_date>=?
+      AND NOT EXISTS(SELECT 1 FROM feedback f WHERE f.student_id=s.id AND f.kind='check-in' AND f.week=?)
+      AND NOT EXISTS(SELECT 1 FROM delivery r WHERE r.id='reminder-2:'||s.id||':'||? AND r.state='sent')`,week,day,day,week,week))
+      .filter(s=>madridDay(new Date(s.first_sent))<=followUpBefore).slice(0,25);
+    const pending=await all(db,`${recordSql}
       WHERE NOT EXISTS(SELECT 1 FROM delivery d WHERE d.id='feedback:'||f.id AND d.state='sent') ORDER BY f.created_at LIMIT 25`);
+    const reminder=(s,attempt)=>({id:(attempt===1?'reminder:':'reminder-2:')+s.id+':'+week,kind:'weekly-reminder',attempt,week,to:s.email,name:s.name,
+      subject:attempt===1?'Your weekly Gobeyond check-in':'Reminder: your weekly Gobeyond check-in',
+      message:attempt===1?'How has your week abroad been? Share a quick update with your Gobeyond team.'
+        :'We haven’t received your check-in this week yet. It only takes a minute: let your Gobeyond team know how your week abroad is going.',
+      link:origin+'/check-in#'+s.token});
     const outcomes=[];
     for(const [destination,events] of [
-      [env.REMINDER_WEBHOOK_URL,eligible.map(s=>({id:'reminder:'+s.id+':'+week,kind:'weekly-reminder',week,to:s.email,name:s.name,
-        subject:'Your weekly Gobeyond check-in',message:'How has your week abroad been? Share a quick update with your Gobeyond team.',
-        link:origin+'/check-in#'+s.token}))],
+      [env.REMINDER_WEBHOOK_URL,[...eligible.map(s=>reminder(s,1)),...followUps.map(s=>reminder(s,2))]],
       [env.SHEET_WEBHOOK_URL,pending.map(feedbackEvent)]
     ]) {
       if (!destination || !env.WEBHOOK_SECRET) continue;
