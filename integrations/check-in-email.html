@@ -1,0 +1,38 @@
+<p>Hi {{FIRST_NAME}},</p>
+<p>How is your week abroad going? Please take a minute to fill out your Gobeyond check-in.</p>
+<form method="post" action="{{PORTAL_ORIGIN}}/api/email-check-in" target="_blank">
+ <input type="hidden" name="token" value="{{FORM_TOKEN}}">
+ <input type="hidden" name="week" value="{{WEEK}}">
+ <p><label>How are you feeling this week?<br>
+ <select name="mood" required>
+  <option value="">Choose one</option>
+  <option value="1">Struggling</option>
+  <option value="2">Low</option>
+  <option value="3">Okay</option>
+  <option value="4">Good</option>
+  <option value="5">Great</option>
+ </select></label></p>
+ <p><label>Would you like support?<br>
+ <select name="need" required>
+  <option value="none">No, thank you</option>
+  <option value="soon">Yes, when available</option>
+  <option value="urgent">Yes, as soon as possible</option>
+ </select></label></p>
+ <p><label>What is this about? (optional)<br>
+ <select name="topic">
+  <option value="">Choose a topic</option>
+  <option>School</option>
+  <option>Host family or accommodation</option>
+  <option>Friends and settling in</option>
+  <option>Wellbeing</option>
+  <option>Travel or logistics</option>
+  <option>Other</option>
+ </select></label></p>
+ <p><label>Anything else you’d like to share? (optional)<br>
+ <textarea name="note" maxlength="2000" rows="3" cols="36"></textarea>
+ </label></p>
+ <p><input type="submit" value="Submit check-in"></p>
+</form>
+<p>If you can’t submit from your email app, open <a href="{{PORTAL_ORIGIN}}/check-in#{{FORM_TOKEN}}">Form</a>.</p>
+<p>We hope you’re having a great week abroad!</p>
+<p>Best wishes,<br>The Gobeyond team</p>

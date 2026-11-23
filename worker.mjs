@@ -288,10 +288,48 @@ async function api(request,env,ctx,url) {
   return fail('This page does not exist.',404);
 }
 
+const escapeHtml=value=>String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+
+function emailReceipt(message,status,token='') {
+  const link=/^[0-9a-f]{64}$/i.test(token)
+    ? `<p><a class="btn" href="/check-in#${token}">Open your check-in form</a></p>` : '';
+  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gobeyond check-in</title><link rel="stylesheet" href="/style.css"></head>
+    <body><main class="formpage"><section class="card formbody"><h1>Gobeyond check-in</h1>
+    <p class="sub">${escapeHtml(message)}</p>${link}</section></main></body></html>`,{
+    status,headers:{...headers,'content-type':'text/html; charset=utf-8','content-security-policy':"frame-ancestors 'none'"}
+  });
+}
+
+async function emailCheckIn(request,env,ctx,url) {
+  if (request.method!=='POST') return emailReceipt('Open the personal check-in form in your email.',405);
+  if (!request.headers.get('content-type')?.toLowerCase().includes('application/x-www-form-urlencoded'))
+    return emailReceipt('Open your personal form link to check in.',415);
+  if (Number(request.headers.get('content-length'))>32000) return emailReceipt('This check-in is too long.',413);
+  const body=await request.text();
+  if (body.length>32000) return emailReceipt('This check-in is too long.',413);
+  const fields=new URLSearchParams(body);
+  const token=fields.get('token')||'';
+  if (fields.get('week')!==weekOf(today()))
+    return emailReceipt('This email is from a previous week. Open the form for your current check-in.',409,token);
+  const target=new URL('/api/submit',url);
+  const submission={id:id(),token,kind:'check-in',mood:fields.get('mood'),
+    need:fields.get('need'),topic:fields.get('topic'),note:fields.get('note')};
+  const result=await api(new Request(target,{method:'POST',headers:{origin:url.origin},
+    body:JSON.stringify(submission)}),env,ctx,target);
+  if (result.ok) return emailReceipt('Thanks for sharing. Your check-in has been saved.',200);
+  const {error}=await result.json();
+  return emailReceipt(error||'Open your form to try again.',result.status,token);
+}
+
 export default { async fetch(request,env,ctx) {
   const url=new URL(request.url);
   if(url.pathname.startsWith('/api/')) {
-    try { return await api(request,env,ctx,url); }
+    try {
+      if (url.pathname==='/api/email-check-in') return await emailCheckIn(request,env,ctx,url);
+      return await api(request,env,ctx,url);
+    }
     catch(error) {
       if (error instanceof SyntaxError) return fail('The request could not be read.');
       console.error(error.message);

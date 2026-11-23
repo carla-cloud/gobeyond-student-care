@@ -28,3 +28,7 @@ Use the deployment URL ending in `/exec` as the Site runtime variable `SHEET_APP
 Staff can sign in with reusable personal email links. Issuance requires the Site's `STAFF_INVITE_SECRET` and an allowlisted recipient. A reusable link works until the recipient's access is removed or the signing secret changes. Each browser session expires after 30 days or upon sign-out. Keep sign-in links private.
 
 Staff can delete and restore student profiles and feedback from the CRM. Deleting a student pauses their check-ins and hides associated feedback until their profile is restored.
+
+## Check-ins inside an email
+
+Use `integrations/check-in-email.html` for reminder email bodies. Substitute an HTML-escaped first name, the HTTPS Site origin, the student's personal token, and the week starting Monday in Europe/Madrid. The form submits to the same CRM workflow as the web form. Email clients that block embedded forms can use the **Form** link.
