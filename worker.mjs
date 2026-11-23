@@ -22,8 +22,38 @@ const first = (db,sql,...args) => db.prepare(sql).bind(...args).first();
 const run = (db,sql,...args) => db.prepare(sql).bind(...args).run();
 const validDate = value => /^\d{4}-\d\d-\d\d$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
 
-async function deliver(db,url,secret,event) {
-  if (!url || !secret) return 'unconfigured';
+function sheetDestination(env) {
+  if (/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(env.SHEET_APPS_SCRIPT_URL||'') &&
+      env.SHEET_APPS_SCRIPT_SECRET) {
+    return {url:env.SHEET_APPS_SCRIPT_URL,secret:env.SHEET_APPS_SCRIPT_SECRET,googleScript:true};
+  }
+  if (env.SHEET_WEBHOOK_URL && env.WEBHOOK_SECRET)
+    return {url:env.SHEET_WEBHOOK_URL,secret:env.WEBHOOK_SECRET};
+  return null;
+}
+
+async function postToGoogleScript(url,secret,event) {
+  const issuedAt=Date.now();
+  const payload=JSON.stringify(event);
+  const encoder=new TextEncoder();
+  const key=await crypto.subtle.importKey('raw',encoder.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const bytes=new Uint8Array(await crypto.subtle.sign('HMAC',key,encoder.encode(issuedAt+'.'+payload)));
+  const signature=btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');
+  const signal=AbortSignal.timeout(15000);
+  let response=await fetch(url,{method:'POST',redirect:'manual',signal,
+    headers:{'content-type':'application/json'},body:JSON.stringify({issuedAt,payload,signature})});
+  if (response.status===302||response.status===303) {
+    const location=response.headers.get('location');
+    if (!location) return false;
+    const redirect=new URL(location);
+    if (redirect.origin!=='https://script.googleusercontent.com') return false;
+    response=await fetch(redirect,{redirect:'error',signal});
+  }
+  return response.ok && (await response.json()).ok===true;
+}
+
+async function deliver(db,destination,event) {
+  const {url,secret,googleScript}=destination;
   const time = now();
   const lease = await run(db,`INSERT INTO delivery VALUES (?,?,'sending',?)
     ON CONFLICT(id) DO UPDATE SET state='sending',updated_at=excluded.updated_at
@@ -32,10 +62,14 @@ async function deliver(db,url,secret,event) {
   if (!lease.meta.changes) return 'already claimed';
   let state = 'failed';
   try {
-    const response = await fetch(url,{method:'POST',redirect:'error',signal:AbortSignal.timeout(7000),
-      headers:{'content-type':'application/json',authorization:'Bearer '+secret,'idempotency-key':event.id},
-      body:JSON.stringify(event)});
-    if (response.ok) state = 'sent';
+    if (googleScript) {
+      if (await postToGoogleScript(url,secret,event)) state = 'sent';
+    } else {
+      const response=await fetch(url,{method:'POST',redirect:'error',signal:AbortSignal.timeout(7000),
+        headers:{'content-type':'application/json',authorization:'Bearer '+secret,'idempotency-key':event.id},
+        body:JSON.stringify(event)});
+      if (response.ok) state = 'sent';
+    }
   } catch {}
   await run(db,'UPDATE delivery SET state=?,updated_at=? WHERE id=? AND updated_at=?',state,now(),event.id,time);
   return state;
@@ -49,6 +83,7 @@ async function api(request,env,ctx,url) {
   const path=url.pathname;
   const method=request.method;
   const db=env.DB;
+  const sheet=sheetDestination(env);
   const day=today(), week=weekOf(day);
   const email=request.headers.get('oai-authenticated-user-email')?.toLowerCase();
   const allow=String(env.STAFF_EMAILS||'').toLowerCase().split(',').map(s=>s.trim()).filter(Boolean);
@@ -78,13 +113,12 @@ async function api(request,env,ctx,url) {
     const submissionId=text(input.id);
     if (!/^[0-9a-f-]{36}$/i.test(submissionId)) return fail('Reload the form and try again.');
     const priority = need==='urgent' ? 'urgent' : need==='soon'||kind==='message'||mood<=2 ? 'follow' : 'routine';
-    const result=await run(db,`INSERT OR IGNORE INTO feedback
+    await run(db,`INSERT OR IGNORE INTO feedback
       (id,student_id,week,kind,mood,need,topic,note,priority,status,created_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,submissionId,student.id,week,kind,kind==='message'?null:mood,need,topic,note,priority,priority==='routine'?'resolved':'open',now());
     const record=await first(db,'SELECT f.*,s.name,s.destination FROM feedback f JOIN students s ON s.id=f.student_id WHERE f.id=? AND f.student_id=?',submissionId,student.id);
     if (!record) return fail('A check-in for this week already exists. Reload to send a separate message.',409);
-    if (result.meta.changes && env.SHEET_WEBHOOK_URL && env.WEBHOOK_SECRET)
-      ctx.waitUntil(deliver(db,env.SHEET_WEBHOOK_URL,env.WEBHOOK_SECRET,feedbackEvent(record)).catch(()=>{}));
+    if (sheet) ctx.waitUntil(deliver(db,sheet,feedbackEvent(record)).catch(()=>{}));
     return json({saved:true,priority:record.priority});
   }
 
@@ -97,15 +131,15 @@ async function api(request,env,ctx,url) {
       WHERE NOT EXISTS(SELECT 1 FROM delivery d WHERE d.id='feedback:'||f.id AND d.state='sent') ORDER BY f.created_at LIMIT 25`);
     const outcomes=[];
     for(const [destination,events] of [
-      [env.REMINDER_WEBHOOK_URL,eligible.map(s=>({id:'reminder:'+s.id+':'+week,kind:'weekly-reminder',week,to:s.email,name:s.name,
+      [env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET?{url:env.REMINDER_WEBHOOK_URL,secret:env.WEBHOOK_SECRET}:null,eligible.map(s=>({id:'reminder:'+s.id+':'+week,kind:'weekly-reminder',week,to:s.email,name:s.name,
         subject:'Your weekly Gobeyond check-in',message:'How has your week abroad been? Share a quick update with your Gobeyond team.',
         link:origin+'/check-in#'+s.token}))],
-      [env.SHEET_WEBHOOK_URL,pending.map(feedbackEvent)]
+      [sheet,pending.map(feedbackEvent)]
     ]) {
-      if (!destination || !env.WEBHOOK_SECRET) continue;
-      outcomes.push(...await Promise.all(events.map(event=>deliver(db,destination,env.WEBHOOK_SECRET,event))));
+      if (!destination) continue;
+      outcomes.push(...await Promise.all(events.map(event=>deliver(db,destination,event))));
     }
-    return json({reminderConfigured:!!(env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET),sheetConfigured:!!(env.SHEET_WEBHOOK_URL&&env.WEBHOOK_SECRET),
+    return json({reminderConfigured:!!(env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET),sheetConfigured:!!sheet,
       sent:outcomes.filter(s=>s==='sent').length,failed:outcomes.filter(s=>s==='failed').length});
   }
   if (!staff) return fail(signedIn ? 'Staff access is required.' : 'Sign in to open the staff workspace.',signedIn ? 403 : 401);
@@ -116,7 +150,7 @@ async function api(request,env,ctx,url) {
       /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[A-Za-z0-9_-]+\/edit$/.test(env.GOOGLE_SHEET_URL)
       ? env.GOOGLE_SHEET_URL : null;
     return json({students,feedback,day,week,integrations:{
-      sheet:!!(env.SHEET_WEBHOOK_URL&&env.WEBHOOK_SECRET), sheetUrl,
+      sheet:!!sheet, sheetUrl,
       reminder:!!(env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET),
       reminderScheduled:env.WEEKLY_EMAIL_SCHEDULE==='daily'}});
   }

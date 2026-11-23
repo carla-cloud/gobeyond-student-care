@@ -18,3 +18,9 @@ Set `STAFF_EMAILS` to the comma-separated list of staff email addresses. Staff s
 - `JOB_SECRET` authorizes a scheduler to POST to `/api/jobs` using `Authorization: Bearer …`. A private Site also requires its platform service access. Jobs send one reminder per student per Monday–Sunday week and skip students who have already responded. They also retry pending spreadsheet deliveries. A daily run catches students who start midweek, and repeated invocations can drain the bounded batches. Review delivery from Settings during setup.
 
 Test with fictional records and a controlled delivery address before inviting students.
+
+## Instant sync to Google Sheets
+
+The Sheets owner can paste `integrations/google-sheets.gs` into **Extensions → Apps Script** from the destination workbook. In the script's **Project Settings → Script properties**, set `SPREADSHEET_ID` to the workbook ID and `SHEET_APPS_SCRIPT_SECRET` to a securely generated random secret of at least 32 bytes. In **Deploy → New deployment → Web app**, execute as the owner, allow **Anyone**, and authorize the script. The workbook keeps its separate sharing settings. The web app accepts only signed, recent requests.
+
+Use the deployment URL ending in `/exec` as the Site runtime variable `SHEET_APPS_SCRIPT_URL`. Set the matching `SHEET_APPS_SCRIPT_SECRET` as a secret in Sites and redeploy. Submit one test check-in and verify it adds a single row in **Responses**. The immediate path inserts new responses. Later support-status edits remain eligible for the scheduled sync.
