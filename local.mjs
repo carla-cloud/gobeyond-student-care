@@ -5,11 +5,31 @@ await import('./build.mjs');
 const { default:worker }=await import('./dist/server/index.js');
 const db=new DatabaseSync('preview.sqlite');
 db.exec(await readFile('drizzle/0000_initial.sql','utf8'));
-const DB={prepare(sql){return {bind(...args){return {
+for (const [table,file] of [['staff_access','0001_staff_access'],['feedback_edits','0002_feedback_edit_history']]) {
+ const initialized=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table);
+ if (!initialized) db.exec(await readFile('drizzle/'+file+'.sql','utf8'));
+}
+if (!db.prepare("SELECT name FROM pragma_table_info('students') WHERE name='deleted_at'").get()) {
+ db.exec(await readFile('drizzle/0003_record_removals.sql','utf8'));
+}
+const DB={
+ prepare(sql){return {bind(...args){return {
   async first(){return db.prepare(sql).get(...args)??null;},
   async all(){return {results:db.prepare(sql).all(...args)};},
-  async run(){return {meta:db.prepare(sql).run(...args)};}
-};}};}};
+  run(){return {meta:db.prepare(sql).run(...args)};}
+ };}};},
+ batch(statements){
+  db.exec('BEGIN');
+  try {
+   const results=statements.map(statement=>statement.run());
+   db.exec('COMMIT');
+   return results;
+  } catch(error) {
+   db.exec('ROLLBACK');
+   throw error;
+  }
+ }
+};
 const portArg=process.argv.indexOf('--port');
 const port=Number((portArg>=0&&process.argv[portArg+1])||process.env.PORT||3000);
 createServer(async (req,res)=>{
