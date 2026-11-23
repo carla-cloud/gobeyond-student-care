@@ -17,9 +17,10 @@ createServer(async (req,res)=>{
  for await(const chunk of req) parts.push(chunk);
  const headers=new Headers(req.headers);
  headers.set('oai-authenticated-user-id','local-preview');
+ headers.set('oai-authenticated-user-email','staff@example.test');
  const origin=headers.get('origin');
  const host=origin ? new URL(origin).host : headers.get('host');
- const response=await worker.fetch(new Request((origin?new URL(origin).protocol:'http:')+'//'+host+req.url,{method:req.method,headers,body:parts.length?Buffer.concat(parts):undefined}),{DB},{waitUntil(){}});
+ const response=await worker.fetch(new Request((origin?new URL(origin).protocol:'http:')+'//'+host+req.url,{method:req.method,headers,body:parts.length?Buffer.concat(parts):undefined}),{DB,STAFF_EMAILS:'staff@example.test'},{waitUntil(){}});
  res.writeHead(response.status,Object.fromEntries(response.headers));
  res.end(Buffer.from(await response.arrayBuffer()));
 }).listen(port,'0.0.0.0',()=>console.log('Preview listening on '+port));

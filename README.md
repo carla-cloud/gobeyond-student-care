@@ -10,7 +10,7 @@ Run `npm run dev` with Node.js 24 or later. The local preview uses a SQLite file
 
 ## Setting up access and integrations
 
-The hosted workspace starts owner-private. For a rollout, set `STAFF_EMAILS` to the comma-separated staff email allowlist before widening access. Verify that students can open their personal links on the intended site and that non-staff users cannot access the CRM. Treat personal links as credentials.
+Set `STAFF_EMAILS` to the comma-separated list of staff email addresses. Staff sign in with ChatGPT. Students can open their personal links without an account when the Site allows public visitors. Treat personal links as credentials.
 
 - `SHEET_WEBHOOK_URL` receives `{id,kind:"feedback",record}` immediately after a response is stored. Configure the receiving workflow to upsert on `record.id` and write text fields as literal text. The in-app register updates independently of provider availability.
 - `REMINDER_WEBHOOK_URL` receives `{id,kind:"weekly-reminder",week,to,name,subject,message,link}`. Configure the receiving workflow to send the supplied personal link to the intended student. Use the event ID to suppress duplicates.

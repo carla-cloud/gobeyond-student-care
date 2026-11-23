@@ -52,8 +52,8 @@ async function api(request,env,ctx,url) {
   const day=today(), week=weekOf(day);
   const email=request.headers.get('oai-authenticated-user-email')?.toLowerCase();
   const allow=String(env.STAFF_EMAILS||'').toLowerCase().split(',').map(s=>s.trim()).filter(Boolean);
-  // The hosted site starts owner-private. Configure STAFF_EMAILS before widening site access.
-  const staff=Boolean(request.headers.get('oai-authenticated-user-id') && (!allow.length || allow.includes(email)));
+  const signedIn=Boolean(request.headers.get('oai-authenticated-user-id'));
+  const staff=signedIn && allow.includes(email);
   const automation=Boolean(env.JOB_SECRET && request.headers.get('authorization')==='Bearer '+env.JOB_SECRET);
   if (method==='POST' && !automation && request.headers.get('origin')!==url.origin) return fail('Invalid request origin.',403);
 
@@ -61,15 +61,15 @@ async function api(request,env,ctx,url) {
   if (!db) return fail('The CRM database is unavailable.',503);
 
   if (path==='/api/student' || path==='/api/submit') {
-    if ((path==='/api/student' && method!=='GET') || (path==='/api/submit' && method!=='POST')) return fail('Method unavailable.',405);
-    const input = method==='POST' ? await request.json() : {};
-    const token = method==='POST' ? text(input.token) : url.searchParams.get('token');
-    if (!token || token.length!==64) return fail('Ask your Gobeyond coordinator for your personal check-in link.',404);
+    if (method!=='POST') return fail('Method unavailable.',405);
+    const input = await request.json();
+    const token = text(input.token);
+    if (!/^[0-9a-f]{64}$/i.test(token)) return fail('Ask your Gobeyond coordinator for your personal check-in link.',404);
     const student = await first(db,'SELECT id,name,start_date,end_date FROM students WHERE token=?',token);
     if (!student) return fail('Ask your Gobeyond coordinator for your personal check-in link.',404);
     if (student.start_date>day || student.end_date<day) return fail('This check-in link is outside your program dates.',409);
     const existing=await first(db,"SELECT id FROM feedback WHERE student_id=? AND week=? AND kind='check-in'",student.id,week);
-    if (method==='GET') return json({name:student.name,week,submitted:!!existing});
+    if (path==='/api/student') return json({name:student.name,week,submitted:!!existing});
     const kind=input.kind, mood=Number(input.mood), need=input.need, topic=text(input.topic), note=text(input.note);
     if (!['check-in','message'].includes(kind) || !needs.includes(need) || (topic && !topics.includes(topic)) ||
         note.length>2000 || (kind==='check-in' && (!Number.isInteger(mood)||mood<1||mood>5)) ||
@@ -108,7 +108,7 @@ async function api(request,env,ctx,url) {
     return json({reminderConfigured:!!(env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET),sheetConfigured:!!(env.SHEET_WEBHOOK_URL&&env.WEBHOOK_SECRET),
       sent:outcomes.filter(s=>s==='sent').length,failed:outcomes.filter(s=>s==='failed').length});
   }
-  if (!staff) return fail('Staff access is required.',403);
+  if (!staff) return fail(signedIn ? 'Staff access is required.' : 'Sign in to open the staff workspace.',signedIn ? 403 : 401);
 
   if (path==='/api/data' && method==='GET') {
     const [students,feedback]=await Promise.all([all(db,rosterSql),all(db,rowsSql)]);

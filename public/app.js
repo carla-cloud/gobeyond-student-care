@@ -56,7 +56,7 @@ function saveDemo(data){localStorage.setItem(demoKey,JSON.stringify(data));}
 async function request(path,body){
  const response=await fetch(path,body===undefined?{}:{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
  const value=await response.json().catch(()=>({error:'Unable to reach the CRM.'}));
- if(!response.ok) throw new Error(value.error||'Something went wrong.');
+ if(!response.ok) throw Object.assign(new Error(value.error||'Something went wrong.'),{status:response.status});
  return value;
 }
 function showError(form,error){form.querySelector('.error').textContent=error.message;}
@@ -67,7 +67,7 @@ function pill(r){return `<span class="pill ${r.status==='resolved'?'resolved':r.
 function studentLink(s){return location.origin+'/check-in#'+s.token;}
 const views=[['overview','Overview'],['feedback','Feedback'],['students','Students'],['support','Support queue'],['sheet','Spreadsheet'],['settings','Settings']];
 
-let data,view='overview',demo=false,search='',filter='all',loadError='';
+let data,view='overview',demo=false,search='',filter='all';
 const active=()=>data.students.filter(s=>s.start_date<=data.day&&s.end_date>=data.day);
 const current=()=>data.feedback.filter(r=>r.week===data.week&&r.kind==='check-in');
 const queue=()=>data.feedback.filter(r=>r.priority!=='routine'&&r.status!=='resolved').sort((a,b)=>Number(b.priority==='urgent')-Number(a.priority==='urgent')||b.created_at.localeCompare(a.created_at));
@@ -109,7 +109,7 @@ function dataView(){
  if(view==='settings'){
   const {reminderScheduled,reminder,sheet}=data.integrations;
   const reminderCopy=reminderScheduled
-   ? 'The email automation checks daily for active, invited students. Each student who has yet to respond is eligible for one email per week.'
+   ? 'The email automation checks daily for active students. Each student who has yet to respond is eligible for one email per week. Their personal link opens without an account.'
    : 'Active students who have yet to respond are eligible for at most one reminder per week.';
   const reminderStatus=reminderScheduled?'Daily check scheduled':reminder?'Webhook configured':'Connection required';
   const sheetAction=externalSheetLink()||`<span class="pill">${sheet?'Webhook configured':'Connection required'}</span>`;
@@ -143,7 +143,7 @@ function render(){
  const label=views.find(([name])=>name===view)[1];
  app.innerHTML=`<div class="shell"><aside class="sidebar">${brand}<div class="nav-title">WORKSPACE</div><nav aria-label="Workspace">${views.map(([name,label])=>`<button class="nav-btn ${view===name?'active':''}" data-action="${name}" ${view===name?'aria-current="page"':''}>${icon(name,18)}${label}${name==='support'&&queue().length?`<span>${queue().length}</span>`:''}</button>`).join('')}</nav><div class="sidefoot">${avatar('Gobeyond Team')}<div><b>Gobeyond Team</b><small>Student care workspace</small></div></div></aside>
  <main><div class="top"><div>Workspace <span aria-hidden="true">/</span> <b>${label}</b></div><div>${demo?'Sample workspace':'Staff workspace'}</div></div><div class="content">
- ${demo?`<p class="notice">${loadError?esc(loadError)+' ':''}Sample data for trying the portal. <a class="row-link" href="/">Open live workspace</a></p>`:''}
+ ${demo?`<p class="notice">Sample data for trying the portal. <a class="row-link" href="/">Open live workspace</a></p>`:''}
  ${dataView()}</div></main></div>`;
  const query=document.querySelector('#search');
  if(query){
@@ -239,7 +239,7 @@ async function formPage(){
  let student,kind=query.get('type')==='message'?'message':'check-in';
  const shell=(title,sub,body)=>`<main class="formpage">${brand}<section class="hero"><div><div class="eyebrow">${icon('globe',16)} Student support</div><h2>${title}</h2><p>${sub}</p></div></section><section class="card formbody">${body}</section></main>`;
  try{
-  student=preview?{name:'',week:currentWeek,submitted:false}:await request('/api/student?token='+encodeURIComponent(token));
+  student=preview?{name:'',week:currentWeek,submitted:false}:await request('/api/student',{token});
  }catch(error){app.innerHTML=shell('Weekly check-in','Stay in touch with your Gobeyond team.',`<p class="error">${esc(error.message)}</p>`);return;}
  if(student.submitted)kind='message';
  let submissionId=crypto.randomUUID();
@@ -284,7 +284,11 @@ async function boot(){
  if(new URLSearchParams(location.search).has('demo')){demo=true;data=readDemo();render();return;}
  app.innerHTML='<main class="formpage"><p>Loading student care workspace…</p></main>';
  try{data=await request('/api/data');}
- catch(error){demo=true;loadError=error.message;data=readDemo();}
+ catch(error){
+  const signInLink=error.status===401?'<a class="btn primary" href="/signin-with-chatgpt?return_to=%2F" target="_top">Staff sign-in</a>':'';
+  app.innerHTML=`<main class="formpage">${brand}<section class="card formbody"><h1>Staff workspace</h1><p class="sub" style="margin-bottom:16px">${esc(error.message)}</p>${signInLink}</section></main>`;
+  return;
+ }
  render();
  if(!demo&&data.students.length===0){
   document.querySelector('.intro .actions').insertAdjacentHTML('afterbegin','<a class="btn" href="/?demo=1">View sample workspace</a>');
