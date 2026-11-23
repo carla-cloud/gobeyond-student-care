@@ -29,6 +29,6 @@ Staff can sign in with reusable personal email links. Issuance requires the Site
 
 Staff can delete and restore student profiles and feedback from the CRM. Deleting a student pauses their check-ins and hides associated feedback until their profile is restored.
 
-## Check-ins inside an email
+## Weekly check-in emails
 
-Use `integrations/check-in-email.html` for reminder email bodies. Substitute an HTML-escaped first name, the HTTPS Site origin, the student's personal token, and the week starting Monday in Europe/Madrid. The form submits to the same CRM workflow as the web form. Email clients that block embedded forms can use the **Form** link.
+Use `integrations/check-in-email.html` for reminder email bodies. Substitute the student's HTML-escaped first name and personal HTTPS check-in URL. The **Form** link opens their survey in the browser without a sign-in. The hosted reminder schedule configures sending separately.
