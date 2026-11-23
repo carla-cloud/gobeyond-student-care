@@ -229,6 +229,30 @@ const IT={
  'Choose a time first.':'Scegli prima un orario.',
  'Calls can only be booked from an urgent check-in this week.':'Le chiamate si possono prenotare solo da un check-in urgente di questa settimana.',
  'The appointment was not found or is already cancelled.':'L’appuntamento non è stato trovato o è già stato annullato.',
+ // Consultant availability (staff)
+ 'Add availability':'Aggiungi disponibilità',
+ 'Add consultant availability':'Aggiungi disponibilità del consulente',
+ 'Date':'Data',
+ 'From':'Dalle',
+ 'To':'Alle',
+ 'Call length':'Durata della chiamata',
+ '{n} minutes':'{n} minuti',
+ 'Times to add: {times}':'Orari da aggiungere: {times}',
+ 'Add times':'Aggiungi orari',
+ 'Times added: {count}.':'Orari aggiunti: {count}.',
+ 'Remove':'Rimuovi',
+ 'Remove this time?':'Rimuovere questo orario?',
+ '{consultant}, {day} at {time} (Italian time).':'{consultant}, {day} alle {time} (ora italiana).',
+ 'Students will no longer be able to book it.':'Gli studenti non potranno più prenotarlo.',
+ 'Remove time':'Rimuovi orario',
+ 'Keep time':'Mantieni orario',
+ 'Choose a consultant, a date and a time range.':'Scegli un consulente, una data e una fascia oraria.',
+ 'The end time must be after the start time.':'L’orario di fine deve essere successivo a quello di inizio.',
+ 'The time range is shorter than one call.':'La fascia oraria è più breve di una chiamata.',
+ 'Add at most 24 times at once.':'Aggiungi al massimo 24 orari alla volta.',
+ 'Choose times in the future.':'Scegli orari futuri.',
+ 'Some of these times overlap with this consultant’s existing availability.':'Alcuni di questi orari si sovrappongono alla disponibilità già inserita per questo consulente.',
+ 'This time was not found or is no longer open.':'Questo orario non è stato trovato o non è più libero.',
  // Messages returned by the server
  'Unable to reach the CRM.':'Impossibile raggiungere il CRM.',
  'Something went wrong.':'Si è verificato un errore.',
@@ -447,26 +471,102 @@ function calendarView(){
  const slots=(data.slots||[]).filter(s=>callDay(s.starts_at)>=today).sort((a,b)=>a.starts_at.localeCompare(b.starts_at)||a.consultant_name.localeCompare(b.consultant_name));
  const total=status=>slots.filter(s=>s.status===status).length;
  const days=[...new Set(slots.map(s=>callDay(s.starts_at)))];
- const row=s=>`<tr class="slot-${s.status}"><td><b>${callTime(s.starts_at)}–${callTime(s.ends_at)}</b></td><td><b>${esc(s.consultant_name)}</b><span class="cell-sub">${phoneLink(s.consultant_phone)}</span></td><td><span class="pill ${slotClass(s.status)}">${slotLabel(s.status)}</span>${s.status==='booked'?`<span class="cell-sub"><button class="row-link danger" data-cancel-slot="${esc(s.id)}">${t('Cancel')}</button></span>`:''}</td><td class="student-cell">${s.student_name?esc(s.student_name):'—'}</td><td class="note-cell">${s.status==='open'?'—':esc(s.note)||t('No written comment.')}</td></tr>`;
- return title('Calendar','Consultant calls booked by students who asked for urgent support.')+
-  `<div class="calendar-legend">${['open','booked','cancelled'].map(status=>`<span class="pill ${slotClass(status)}">${slotLabel(status)}: ${total(status)}</span>`).join('')}<span class="muted">${t('Times are in Italian time.')}</span></div>`+
+ const action=s=>s.status==='booked'?`<span class="cell-sub"><button class="row-link danger" data-cancel-slot="${esc(s.id)}">${t('Cancel')}</button></span>`
+  :s.status==='open'?`<span class="cell-sub"><button class="row-link muted-link" data-remove-slot="${esc(s.id)}">${t('Remove')}</button></span>`:'';
+ const row=s=>`<tr class="slot-${s.status}"><td><b>${callTime(s.starts_at)}–${callTime(s.ends_at)}</b></td><td><b>${esc(s.consultant_name)}</b><span class="cell-sub">${phoneLink(s.consultant_phone)}</span></td><td><span class="pill ${slotClass(s.status)}">${slotLabel(s.status)}</span>${action(s)}</td><td class="student-cell">${s.student_name?esc(s.student_name):'—'}</td><td class="note-cell">${s.status==='open'?'—':esc(s.note)||t('No written comment.')}</td></tr>`;
+ return title('Calendar','Consultant calls booked by students who asked for urgent support.',btn('Add availability','add-slots','plus',true))+
+  `<div class="calendar-legend">${['open','booked','cancelled'].map(status=>`<span class="pill ${slotClass(status)}">${slotLabel(status)}: ${total(status)}</span>`).join('')}<span class="muted">${t('Times are in Italian time.')}</span><span class="calendar-status" id="page-status" role="status"></span></div>`+
   (days.length?days.map(key=>{
    const list=slots.filter(s=>callDay(s.starts_at)===key);
    return `<section class="card calendar-day"><div class="card-head"><h2>${callDayLabel(list[0].starts_at)}</h2></div>${table(['Time','Consultant','Status','Student','Check-in note'],list.map(row))}</section>`;
   }).join(''):`<section class="card"><p class="empty">${t('No consultant slots from today onward.')}</p></section>`);
 }
-function cancelDialog(slot){
- openDialog(t('Cancel appointment?'),`<p class="sub">${t('{student} with {consultant}, {day} at {time} (Italian time).',{student:esc(slot.student_name),consultant:esc(slot.consultant_name),day:callDayLabel(slot.starts_at,false),time:callTime(slot.starts_at)})}</p>
- <p class="footnote">${t('The student is not notified automatically, and this time will not be offered again.')}</p><br>
- <form><p class="error" role="alert"></p><div class="actions"><button class="btn danger">${t('Cancel appointment')}</button><button type="button" class="btn" data-keep>${t('Keep appointment')}</button></div></form>`);
+// Confirmation dialog for calendar actions; `apply` does the change (sample data or server).
+function confirmDialog(heading,summary,warning,confirmLabel,keepLabel,apply){
+ openDialog(heading,`<p class="sub">${summary}</p><p class="footnote">${warning}</p><br>
+ <form><p class="error" role="alert"></p><div class="actions"><button class="btn danger">${confirmLabel}</button><button type="button" class="btn" data-keep>${keepLabel}</button></div></form>`);
  const form=detail.querySelector('form');
  form.querySelector('[data-keep]').onclick=()=>detail.close();
  form.onsubmit=async event=>{
   event.preventDefault();
-  try{
+  try{await apply();detail.close();render();}
+  catch(error){
+   showError(form,error);
+   // Someone else may have changed this slot (e.g. a student booked it): refresh the calendar behind the dialog.
+   if(!demo)request('/api/data').then(fresh=>{data=fresh;render();}).catch(()=>{});
+  }
+ };
+}
+function cancelDialog(slot){
+ confirmDialog(t('Cancel appointment?'),
+  t('{student} with {consultant}, {day} at {time} (Italian time).',{student:esc(slot.student_name),consultant:esc(slot.consultant_name),day:callDayLabel(slot.starts_at,false),time:callTime(slot.starts_at)}),
+  t('The student is not notified automatically, and this time will not be offered again.'),t('Cancel appointment'),t('Keep appointment'),
+  async()=>{
    if(demo){const stored=data.slots.find(s=>s.id===slot.id);Object.assign(stored,{status:'cancelled',cancelled_at:new Date().toISOString()});saveDemo(data);}
    else{await request('/api/appointments/cancel',{id:slot.id});data=await request('/api/data');}
+  });
+}
+function removeSlotDialog(slot){
+ confirmDialog(t('Remove this time?'),
+  t('{consultant}, {day} at {time} (Italian time).',{consultant:esc(slot.consultant_name),day:callDayLabel(slot.starts_at,false),time:callTime(slot.starts_at)}),
+  t('Students will no longer be able to book it.'),t('Remove time'),t('Keep time'),
+  async()=>{
+   if(demo){
+    if(!data.slots.some(s=>s.id===slot.id&&s.status==='open'))throw new Error('This time was not found or is no longer open.');
+    data.slots=data.slots.filter(s=>s.id!==slot.id);saveDemo(data);
+   }else{await request('/api/slots/remove',{id:slot.id});data=await request('/api/data');}
+  });
+}
+// Add availability: back-to-back calls of the chosen length between "From" and "To" (Italian time).
+const callLengths=[15,30,45,60];
+function rangeTimes(from,to,minutes){
+ const toMinutes=value=>{const [h,m]=value.split(':').map(Number);return h*60+m;};
+ const times=[];
+ for(let m=toMinutes(from);m+minutes<=toMinutes(to);m+=minutes)times.push(String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'));
+ return times;
+}
+const consultantsOf=()=>data.consultants||consultantList.map(([id,name,phone])=>({id,name,phone}));
+function availabilityDialog(){
+ const people=consultantsOf();
+ openDialog(t('Add consultant availability'),`<form>
+  <label class="field">${t('Consultant')}<select name="consultant_id" required>${people.map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · ${esc(c.phone)}</option>`).join('')}</select></label>
+  <label class="field">${t('Date')}<input name="date" type="date" required min="${callDay(new Date().toISOString())}" value="${dateAfter(1)}"></label>
+  <div class="field-row"><label class="field">${t('From')}<input name="from" type="time" step="300" required value="09:00"></label><label class="field">${t('To')}<input name="to" type="time" step="300" required value="12:00"></label></div>
+  <label class="field">${t('Call length')}<select name="minutes">${callLengths.map(n=>`<option value="${n}" ${n===30?'selected':''}>${t('{n} minutes',{n})}</option>`).join('')}</select></label>
+  <p class="slot-preview" id="slot-preview"></p>
+  <p class="error" role="alert"></p><button class="btn primary">${t('Add times')}</button></form>`);
+ const form=detail.querySelector('form');
+ const values=()=>Object.fromEntries(new FormData(form));
+ const preview=()=>{
+  const v=values();
+  const times=v.from&&v.to&&v.to>v.from?rangeTimes(v.from,v.to,Number(v.minutes)):[];
+  form.querySelector('#slot-preview').textContent=times.length?t('Times to add: {times}',{times:times.join(', ')})+' · '+t('Times are in Italian time.'):'';
+ };
+ form.addEventListener('input',preview);
+ form.addEventListener('change',preview);
+ preview();
+ form.onsubmit=async event=>{
+  event.preventDefault();
+  const v=values();
+  try{
+   let count;
+   if(demo){
+    const minutes=Number(v.minutes),person=people.find(c=>c.id===v.consultant_id);
+    if(!person||!v.date||!v.from||!v.to)throw new Error('Choose a consultant, a date and a time range.');
+    if(v.to<=v.from)throw new Error('The end time must be after the start time.');
+    const times=rangeTimes(v.from,v.to,minutes);
+    if(!times.length)throw new Error('The time range is shorter than one call.');
+    if(times.length>24)throw new Error('Add at most 24 times at once.');
+    const added=times.map(time=>{const starts_at=italianTime(v.date,time);return {id:crypto.randomUUID(),starts_at,ends_at:new Date(Date.parse(starts_at)+minutes*60000).toISOString(),status:'open',consultant_name:person.name,consultant_phone:person.phone,student_name:null,feedback_id:null,note:null};});
+    if(added[0].starts_at<=new Date().toISOString())throw new Error('Choose times in the future.');
+    if(data.slots.some(s=>s.consultant_name===person.name&&s.status!=='cancelled'&&s.starts_at<added.at(-1).ends_at&&s.ends_at>added[0].starts_at))throw new Error('Some of these times overlap with this consultant’s existing availability.');
+    data.slots.push(...added);saveDemo(data);count=added.length;
+   }else{
+    count=(await request('/api/slots/add',{...v,minutes:Number(v.minutes)})).added;
+    data=await request('/api/data');
+   }
    detail.close();render();
+   document.querySelector('#page-status').textContent=t('Times added: {count}.',{count});
   }catch(error){showError(form,error);}
  };
 }
@@ -590,6 +690,11 @@ app.addEventListener('click',async event=>{
  const action=button.dataset.action;
  if(views.some(([key])=>key===action)){view=action;search='';filter='all';render();return;}
  if(action==='add')addDialog();
+ if(action==='add-slots')availabilityDialog();
+ if(button.dataset.removeSlot){
+  const slot=(data.slots||[]).find(s=>s.id===button.dataset.removeSlot);
+  if(slot)removeSlotDialog(slot);
+ }
  if(action==='export')download();
  if(action==='jobs'){
   const status=document.querySelector('#page-status');

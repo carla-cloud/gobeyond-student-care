@@ -59,6 +59,16 @@ function italianTime(date,time) {
   }
   return new Date(utc).toISOString();
 }
+// Start times ('HH:MM') of back-to-back calls of `minutes` that fit between `from` and `to`.
+function rangeTimes(from,to,minutes) {
+  const toMinutes=value=>{const [h,m]=value.split(':').map(Number);return h*60+m;};
+  const times=[];
+  for (let m=toMinutes(from); m+minutes<=toMinutes(to); m+=minutes) times.push(String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'));
+  return times;
+}
+const validTime = value => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+const callLengths = [15,30,45,60];
+const maxSlotsPerAdd = 24;
 function exampleSlots(from) {
   const days=[];
   for (let date=shiftDay(from,1); days.length<3; date=shiftDay(date,1)) {
@@ -217,11 +227,12 @@ async function api(request,env,ctx,url) {
   if (!staff) return fail(signedIn ? 'Staff access is required.' : 'Sign in to open the staff workspace.',signedIn ? 403 : 401);
 
   if (path==='/api/data' && method==='GET') {
-    const [students,feedback,slots]=await Promise.all([all(db,rosterSql),all(db,rowsSql),all(db,calendarRowsSql,new Date(Date.now()-2*86400000).toISOString())]);
+    const [students,feedback,slots,consultantRows]=await Promise.all([all(db,rosterSql),all(db,rowsSql),all(db,calendarRowsSql,new Date(Date.now()-2*86400000).toISOString()),
+      all(db,'SELECT id,name,phone FROM consultants ORDER BY name')]);
     const sheetUrl = typeof env.GOOGLE_SHEET_URL === 'string' &&
       /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[A-Za-z0-9_-]+\/edit$/.test(env.GOOGLE_SHEET_URL)
       ? env.GOOGLE_SHEET_URL : null;
-    return json({students,feedback,slots,day,week,integrations:{
+    return json({students,feedback,slots,consultants:consultantRows,day,week,integrations:{
       sheet:!!(env.SHEET_WEBHOOK_URL&&env.WEBHOOK_SECRET), sheetUrl,
       reminder:!!(env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET),
       reminderScheduled:env.WEEKLY_EMAIL_SCHEDULE==='daily'}});
@@ -245,6 +256,29 @@ async function api(request,env,ctx,url) {
     const input=await request.json();
     const result=await run(db,"UPDATE slots SET status='cancelled',cancelled_at=? WHERE id=? AND status='booked'",now(),text(input.id));
     return result.meta.changes ? json({saved:true}) : fail('The appointment was not found or is already cancelled.',404);
+  }
+  // Staff add availability: back-to-back open slots for one consultant on one day (Italian time).
+  if (path==='/api/slots/add' && method==='POST') {
+    const input=await request.json();
+    const consultant=await first(db,'SELECT id FROM consultants WHERE id=?',text(input.consultant_id));
+    const date=text(input.date), from=text(input.from), to=text(input.to), minutes=Number(input.minutes);
+    if (!consultant||!validDate(date)||!validTime(from)||!validTime(to)||!callLengths.includes(minutes)) return fail('Choose a consultant, a date and a time range.');
+    if (to<=from) return fail('The end time must be after the start time.');
+    const times=rangeTimes(from,to,minutes);
+    if (!times.length) return fail('The time range is shorter than one call.');
+    if (times.length>maxSlotsPerAdd) return fail('Add at most 24 times at once.');
+    const added=times.map(time=>{const starts=italianTime(date,time);return {starts,ends:new Date(Date.parse(starts)+minutes*60000).toISOString()};});
+    if (added[0].starts<=now()) return fail('Choose times in the future.');
+    const overlap=await first(db,"SELECT 1 AS found FROM slots WHERE consultant_id=? AND status!='cancelled' AND starts_at<? AND ends_at>?",consultant.id,added.at(-1).ends,added[0].starts);
+    if (overlap) return fail('Some of these times overlap with this consultant’s existing availability.',409);
+    for (const slot of added) await run(db,"INSERT INTO slots (id,consultant_id,starts_at,ends_at,status) VALUES (?,?,?,?,'open')",id(),consultant.id,slot.starts,slot.ends);
+    return json({saved:true,added:added.length},201);
+  }
+  // Staff remove an open slot. Booked or cancelled slots are never removed, so no booking is lost.
+  if (path==='/api/slots/remove' && method==='POST') {
+    const input=await request.json();
+    const result=await run(db,"DELETE FROM slots WHERE id=? AND status='open'",text(input.id));
+    return result.meta.changes ? json({saved:true}) : fail('This time was not found or is no longer open.',404);
   }
   return fail('This page does not exist.',404);
 }
