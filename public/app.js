@@ -21,6 +21,7 @@ const moods=['','Struggling','Low','Okay','Good','Great'];
 const faces=['','😟','🙁','😐','🙂','😄'];
 const topics=['School','Host family or accommodation','Friends and settling in','Wellbeing','Travel or logistics','Other'];
 const statuses=['open','in progress','resolved'];
+const supportOptions='<option value="none">No, thank you</option><option value="soon">Yes, when available</option><option value="urgent">Yes, as soon as possible</option>';
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const capital=value=>value.charAt(0).toUpperCase()+value.slice(1);
 const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -77,12 +78,29 @@ const rowButton=r=>`<button class="row-link" data-record="${esc(r.id)}">View</bu
 const metric=(label,value,desc,i,color='')=>`<div class="metric"><div class="metric-top"><span class="tile ${color}">${icon(i)}</span>${label}</div><strong>${value}</strong><small>${desc}</small></div>`;
 const title=(name,sub,buttons='')=>`<section class="intro"><div><h1>${name}</h1><p>${sub}</p></div><div class="actions">${buttons}</div></section>`;
 const btn=(label,action,i,primary=false)=>`<button class="btn ${primary?'primary':''}" data-action="${action}">${i?icon(i,16):''}${label}</button>`;
+const feedbackPriority=(kind,mood,need)=>need==='urgent'?'urgent':need==='soon'||kind==='message'||mood<=2?'follow':'routine';
 const externalSheetLink=()=>data.integrations.sheetUrl
  ? `<a class="btn" href="${esc(data.integrations.sheetUrl)}" target="_blank" rel="noopener noreferrer">${icon('sheet',16)} Open Google Sheet</a>`
  : '';
 const table=(head,rows,empty='No records to show.')=>rows.length?`<div class="table-wrap"><table><thead><tr>${head.map(h=>'<th>'+h+'</th>').join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`:`<p class="empty">${empty}</p>`;
 const feedbackTable=(rows,full=false)=>table(full?['Student','Week of','Type','Mood','Topic','Status','']:['Student','Mood','Status',''],
  rows.map(r=>`<tr><td>${person(r)}</td>${full?`<td>${dateLabel(r.week)}</td><td>${r.kind==='message'?'Message':'Check-in'}</td>`:''}<td>${r.mood?faces[r.mood]+' '+moods[r.mood]:'—'}</td>${full?`<td>${esc(r.topic)||'—'}</td>`:''}<td>${pill(r)}</td><td>${rowButton(r)}</td></tr>`),'Feedback appears here as students submit check-ins and messages.');
+function removalButton(action,type,record,label=capital(action),style='row-link'){
+ const name=type==='students'?record.name:'response from '+record.name;
+ return `<button type="button" class="${style}" data-removal="${action}" data-record-type="${type}" data-record-id="${esc(record.id)}" aria-label="${capital(action)} ${esc(name)}">${label}</button>`;
+}
+function recentlyDeleted(type,expanded){
+ if(demo)return '';
+ const students=type==='students';
+ const records=(students?data.deletedStudents:data.deletedFeedback)??[];
+ const columns=students?['Student','Email','']:['Student','Week of','Type','Topic',''];
+ const rows=records.map(record=>`<tr><td>${person(record)}</td>${students
+  ?`<td>${esc(record.email)}</td>`
+  :`<td>${dateLabel(record.week)}</td><td>${record.kind==='message'?'Message':'Check-in'}</td><td>${esc(record.topic)||'—'}</td>`}
+  <td>${removalButton('restore',type,record)}</td></tr>`);
+ return `<details class="card" style="margin-top:16px" ${expanded?'open':''}><summary class="formbody">Recently deleted${records.length?` (${records.length})`:''}</summary>
+ ${table(columns,rows,students?'No deleted students.':'No deleted responses.')}</details>`;
+}
 
 function overview(){
  const count=active().length;
@@ -102,18 +120,21 @@ function overview(){
  <div class="card"><div class="card-head"><div><h2>Support queue</h2><p>Students who may need help</p></div></div><div class="queue">${open.length?open.slice(0,5).map(r=>`<button class="queue-item" data-record="${esc(r.id)}">${avatar(r.name)}<span class="copy"><b>${esc(r.name)}</b><small>${esc(r.topic||r.note||'Requested support')}</small></span>${pill(r)}</button>`).join(''):'<p class="empty">No open follow-ups.</p>'}</div></div>
  </section>`;
 }
-function dataView(){
+function dataView(expandDeleted=false){
  if(view==='overview') return overview();
  if(view==='students') return title('Students','Manage program dates and personal check-in links.',btn('Add student','add','plus',true))+
-  `<section class="card"><div class="card-head"><h2>Student directory</h2></div>${table(['Student','Email','Program dates','This week',''],data.students.map(s=>`<tr><td>${person(s)}</td><td>${esc(s.email)}</td><td>${dateLabel(s.start_date)} – ${dateLabel(s.end_date)}</td><td><span class="pill ${current().some(r=>r.student_id===s.id)?'resolved':''}">${s.start_date>data.day?'Upcoming':s.end_date<data.day?'Completed':current().some(r=>r.student_id===s.id)?'Received':'Awaiting'}</span></td><td>${s.token?`<button class="row-link" data-copy="${esc(s.id)}">Copy check-in link</button>`:'Sample student'}</td></tr>`),'Add a student to begin tracking their weekly check-ins.')}</section><p class="footnote" id="page-status" role="status"></p>`;
+  `<section class="card"><div class="card-head"><h2>Student directory</h2></div>${table(['Student','Email','Program dates','This week',''],data.students.map(s=>`<tr><td>${person(s)}</td><td>${esc(s.email)}</td><td>${dateLabel(s.start_date)} – ${dateLabel(s.end_date)}</td><td><span class="pill ${current().some(r=>r.student_id===s.id)?'resolved':''}">${s.start_date>data.day?'Upcoming':s.end_date<data.day?'Completed':current().some(r=>r.student_id===s.id)?'Received':'Awaiting'}</span></td><td><div class="actions"><button class="row-link" data-edit-student="${esc(s.id)}" aria-label="Edit ${esc(s.name)}">Edit</button>${s.token?`<button class="row-link" data-copy="${esc(s.id)}">Copy check-in link</button>`:'Sample student'}${demo?'':removalButton('delete','students',s)}</div></td></tr>`),'Add a student to begin tracking their weekly check-ins.')}</section><p class="footnote" id="page-status" role="status"></p>`+
+  recentlyDeleted('students',expandDeleted);
  if(view==='settings'){
+  const staffSignOut=data.staffSession?btn('Sign out','sign-out'):'';
+
   const {reminderScheduled,reminder,sheet}=data.integrations;
   const reminderCopy=reminderScheduled
    ? 'The email automation checks daily for active students. Each student who has yet to respond is eligible for one email per week. Their personal link opens without an account.'
    : 'Active students who have yet to respond are eligible for at most one reminder per week.';
   const reminderStatus=reminderScheduled?'Daily check scheduled':reminder?'Webhook configured':'Connection required';
   const sheetAction=externalSheetLink()||`<span class="pill">${sheet?'Webhook configured':'Connection required'}</span>`;
-  return title('Settings','Manage weekly delivery and spreadsheet syncing.')+`
+  return title('Settings','Manage weekly delivery and spreadsheet syncing.',staffSignOut)+`
    <section class="card formbody">
      <h2>Weekly reminders</h2>
      <p class="sub">${reminderCopy}</p>
@@ -129,7 +150,8 @@ function dataView(){
  return title(sheet?'Spreadsheet':support?'Support queue':'Feedback',sheet?'Every submitted check-in and message, in one table.':support?'Review student needs and update follow-up status.':'Review weekly check-ins and messages from students.',sheet?externalSheetLink()+btn('Export CSV','export','download',true):'')+
  `<section class="card"><div class="card-head"><h2>${sheet?'Response register':support?'Open follow-ups':'All responses'}</h2></div>
  <div class="filters"><input id="search" type="search" aria-label="Search responses" placeholder="Search students or topics" value="${esc(search)}"><select id="filter" aria-label="Filter responses" style="width:auto">
- <option value="all">All ${support?'priorities':'responses'}</option><option value="urgent">Urgent</option><option value="follow">Follow-up</option>${support?'':'<option value="check-in">Check-ins</option><option value="message">Messages</option>'}</select></div><div id="filtered"></div></section>`;
+ <option value="all">All ${support?'priorities':'responses'}</option><option value="urgent">Urgent</option><option value="follow">Follow-up</option>${support?'':'<option value="check-in">Check-ins</option><option value="message">Messages</option>'}</select></div><div id="filtered"></div></section>`+
+ (view==='feedback'?recentlyDeleted('feedback',expandDeleted):'');
 }
 function filterRows(){
  const result=document.querySelector('#filtered');
@@ -139,12 +161,13 @@ function filterRows(){
   [r.name,r.destination,r.topic,r.note].join(' ').toLowerCase().includes(search.toLowerCase()));
  result.innerHTML=view==='sheet'?table(['Submitted','Week of','Student','Destination','Type','Mood','Support','Topic','Feedback','Status',''],rows.map(r=>`<tr><td>${dateLabel(r.created_at)}</td><td>${dateLabel(r.week)}</td><td>${esc(r.name)}</td><td>${esc(r.destination)}</td><td>${esc(r.kind)}</td><td>${r.mood??'—'}</td><td>${esc(r.need)}</td><td>${esc(r.topic)||'—'}</td><td style="max-width:280px;white-space:normal">${esc(r.note)||'—'}</td><td>${pill(r)}</td><td>${rowButton(r)}</td></tr>`)):feedbackTable(rows,true);
 }
-function render(){
+function render(expandDeleted=false){
  const label=views.find(([name])=>name===view)[1];
  app.innerHTML=`<div class="shell"><aside class="sidebar">${brand}<div class="nav-title">WORKSPACE</div><nav aria-label="Workspace">${views.map(([name,label])=>`<button class="nav-btn ${view===name?'active':''}" data-action="${name}" ${view===name?'aria-current="page"':''}>${icon(name,18)}${label}${name==='support'&&queue().length?`<span>${queue().length}</span>`:''}</button>`).join('')}</nav><div class="sidefoot">${avatar('Gobeyond Team')}<div><b>Gobeyond Team</b><small>Student care workspace</small></div></div></aside>
- <main><div class="top"><div>Workspace <span aria-hidden="true">/</span> <b>${label}</b></div><div>${demo?'Sample workspace':'Staff workspace'}</div></div><div class="content">
+ <main><div class="top"><div>Workspace <span aria-hidden="true">/</span> <b>${label}</b></div><div>${data.staffSession?btn('Sign out','sign-out'):demo?'Sample workspace':'Staff workspace'}</div></div><div class="content">
  ${demo?`<p class="notice">Sample data for trying the portal. <a class="row-link" href="/">Open live workspace</a></p>`:''}
- ${dataView()}</div></main></div>`;
+ <p id="record-notice" class="notice" role="status" hidden></p>
+ ${dataView(expandDeleted)}</div></main></div>`;
  const query=document.querySelector('#search');
  if(query){
   query.oninput=()=>{search=query.value;filterRows();};
@@ -157,15 +180,19 @@ function render(){
 function openDialog(title,body){
  detail.innerHTML=`<div class="dialog-head"><h2>${title}</h2><button data-close title="Close" aria-label="Close">✕</button></div>${body}`;
  detail.querySelector('[data-close]').onclick=()=>detail.close();
- detail.showModal();
+ if(!detail.open)detail.showModal();
 }
 function recordDialog(record){
  openDialog(esc(record.name),`<p class="sub">${esc(record.destination)} · Week of ${dateLabel(record.week)} · ${record.kind==='message'?'Message':'Check-in'}</p>
  <p style="margin:14px 0">${pill(record)} ${record.mood?faces[record.mood]+' '+moods[record.mood]:''}</p>
  <strong>${esc(record.topic||'Student feedback')}</strong><p class="record-text">${esc(record.note)||'No written comment.'}</p>
  <p class="footnote">Support requested: ${esc(record.need==='none'?'No':record.need==='urgent'?'As soon as possible':'Yes, when available')}</p><br>
- <form><label class="field">Follow-up status<select name="status">${options(statuses)}</select></label><p class="error" role="alert"></p><button class="btn primary">Save status</button></form>`);
+ <form><label class="field">Follow-up status<select name="status">${options(statuses)}</select></label><p class="error" role="alert"></p>
+ <div class="actions"><button class="btn primary">Save status</button><button type="button" class="btn" data-edit-response>Edit response</button>${demo?'':removalButton('delete','feedback',record,'Delete response','btn')}</div></form>`);
  const form=detail.querySelector('form');
+ form.querySelector('[data-edit-response]').onclick=()=>editResponseDialog(record);
+ const remove=form.querySelector('[data-removal]');
+ if(remove)remove.onclick=()=>changeRemoval(remove,form);
  form.elements.status.value=record.status;
  form.onsubmit=async event=>{
   event.preventDefault();
@@ -177,20 +204,114 @@ function recordDialog(record){
   }catch(error){showError(form,error);}
  };
 }
-function addDialog(){
- openDialog('Add a student',`<form>${textField('Full name','name','text','maxlength="100"')}${textField('Email','email','email','maxlength="254"')}${textField('Destination','destination','text','maxlength="120"')}${textField('Program start','start_date','date')}${textField('Program end','end_date','date')}<p class="error" role="alert"></p><button class="btn primary">Add student</button></form>`);
+function showRecordNotice(message,isError=false){
+ const notice=document.querySelector('#record-notice');
+ notice.className=isError?'notice error':'notice';
+ notice.hidden=false;
+ notice.textContent=message;
+}
+async function changeRemoval(button,form){
+ const {removal,recordType,recordId}=button.dataset;
+ const isStudent=recordType==='students';
+ const deleting=removal==='delete';
+ const typeLabel=isStudent?'Student':'Response';
+ const section=isStudent?'Students':'Feedback';
+ if(deleting){
+  const record=(isStudent?data.students:data.feedback).find(row=>row.id===recordId);
+  if(!record)return;
+  const prompt=isStudent
+   ? `Delete ${record.name}? This hides their feedback and stops their check-ins until you restore the student.`
+   : 'Delete this response? You can restore it from Recently deleted in Feedback.';
+  if(!window.confirm(prompt))return;
+ }
+ button.disabled=true;
+ try{
+  await request(`/api/${recordType}/${removal}`,{id:recordId});
+  data=await request('/api/data');
+  if(form&&detail.open&&detail.contains(form))detail.close();
+  render(true);
+  showRecordNotice(deleting?`${typeLabel} deleted. Restore it from Recently deleted in ${section}.`:`${typeLabel} restored.`);
+ }catch(error){
+  if(form&&detail.open&&detail.contains(form))showError(form,error);
+  else showRecordNotice(error.message,true);
+ }finally{button.disabled=false;}
+}
+function editResponseDialog(record){
+ const message=record.kind==='message';
+ openDialog('Edit response',`<form>
+ ${message?'':`<label class="field">Mood<select name="mood" required><option value="">Choose a mood</option>${moods.slice(1).map((mood,i)=>`<option value="${i+1}">${mood}</option>`).join('')}</select></label>`}
+ <label class="field">Support requested<select name="need" required>${supportOptions}</select></label>
+ <label class="field">Topic (optional)<select name="topic"><option value="">Choose a topic</option>${options(topics)}</select></label>
+ <label class="field">${message?'Message':'Written feedback (optional)'}<textarea name="note" maxlength="2000" ${message?'required':''}></textarea></label>
+ <p class="error" role="alert"></p><div class="actions"><button type="submit" class="btn primary">Save response</button><button type="button" class="btn" data-cancel>Cancel</button></div></form>`);
  const form=detail.querySelector('form');
+ if(!message)form.elements.mood.value=record.mood??'';
+ form.elements.need.value=record.need;
+ form.elements.topic.value=record.topic??'';
+ form.elements.note.value=record.note??'';
+ form.querySelector('[data-cancel]').onclick=()=>recordDialog(record);
+ form.querySelector('select').focus();
  form.onsubmit=async event=>{
   event.preventDefault();
-  const student=Object.fromEntries(new FormData(form));
+  const button=form.querySelector('[type="submit"]');
+  button.disabled=true;
+  const fields=Object.fromEntries(new FormData(form));
+  const changes={id:record.id,mood:message?null:Number(fields.mood),need:fields.need,topic:fields.topic,note:fields.note.trim()};
   try{
-   if(student.start_date>student.end_date)throw new Error('Choose an end date on or after the start date.');
+   if(message&&!changes.note)throw new Error('Enter a message before saving.');
    if(demo){
-    if(data.students.some(s=>s.email.toLowerCase()===student.email.toLowerCase()))throw new Error('This student email already exists.');
-    data.students.push({...student,id:crypto.randomUUID()});saveDemo(data);
-   }else{await request('/api/students',student);data=await request('/api/data');}
-   detail.close();render();
+    const priority=feedbackPriority(record.kind,changes.mood,changes.need);
+    let status=record.status;
+    if(priority==='routine')status='resolved';
+    else if(record.priority==='routine'||(status==='resolved'&&priority==='urgent'&&record.priority!=='urgent'))status='open';
+    Object.assign(record,changes,{priority,status});
+    saveDemo(data);
+   }else{
+    await request('/api/feedback/update',changes);
+    data=await request('/api/data');
+   }
+   const updated=data.feedback.find(row=>row.id===record.id);
+   render();
+   if(detail.open&&detail.contains(form)){
+    if(updated)recordDialog(updated);
+    else detail.close();
+   }
   }catch(error){showError(form,error);}
+  finally{button.disabled=false;}
+ };
+}
+function addDialog(student){
+ openDialog(student?'Edit student':'Add a student',`<form>${textField('Full name','name','text','maxlength="100"')}${textField('Email','email','email','maxlength="254"')}${textField('Destination','destination','text','maxlength="120"')}${textField('Program start','start_date','date')}${textField('Program end','end_date','date')}<p class="error" role="alert"></p><button type="submit" class="btn primary">${student?'Save changes':'Add student'}</button></form>`);
+ const form=detail.querySelector('form');
+ if(student){
+  for(const name of ['name','email','destination','start_date','end_date'])form.elements[name].value=student[name]??'';
+ }
+ form.onsubmit=async event=>{
+  event.preventDefault();
+  const button=form.querySelector('[type="submit"]');
+  button.disabled=true;
+  const fields=Object.fromEntries(new FormData(form));
+  try{
+   if(fields.start_date>fields.end_date)throw new Error('Choose an end date on or after the start date.');
+   if(demo){
+    if(data.students.some(s=>s.id!==student?.id&&s.email.toLowerCase()===fields.email.toLowerCase()))throw new Error('This student email already exists.');
+    if(student){
+     Object.assign(student,fields);
+     for(const row of data.feedback.filter(r=>r.student_id===student.id)){
+      row.name=student.name;
+      row.destination=student.destination;
+     }
+    }else data.students.push({...fields,id:crypto.randomUUID()});
+    saveDemo(data);
+   }else{
+    if(student)await request('/api/students/update',{...fields,id:student.id});
+    else await request('/api/students',fields);
+    data=await request('/api/data');
+   }
+   if(detail.open&&detail.contains(form))detail.close();
+   render();
+  }catch(error){showError(form,error);}
+  finally{button.disabled=false;}
  };
 }
 function download(){
@@ -209,8 +330,13 @@ app.addEventListener('click',async event=>{
  const button=event.target.closest('button');
  if(!button||!data)return;
  const action=button.dataset.action;
+ if(button.dataset.removal){await changeRemoval(button);return;}
  if(views.some(([key])=>key===action)){view=action;search='';filter='all';render();return;}
  if(action==='add')addDialog();
+ if(action==='sign-out'){
+  try{await request('/api/staff/sign-out',{});location.assign('/');}
+  catch(error){openDialog('Sign-out',`<p class="error">${esc(error.message)}</p>`);}
+ }
  if(action==='export')download();
  if(action==='jobs'){
   const status=document.querySelector('#page-status');
@@ -224,6 +350,10 @@ app.addEventListener('click',async event=>{
  if(button.dataset.record){
   const record=data.feedback.find(r=>r.id===button.dataset.record);
   if(record)recordDialog(record);
+ }
+ if(button.dataset.editStudent){
+  const student=data.students.find(s=>s.id===button.dataset.editStudent);
+  if(student)addDialog(student);
  }
  if(button.dataset.copy){
   const student=data.students.find(s=>s.id===button.dataset.copy);
@@ -251,7 +381,7 @@ async function formPage(){
    <div class="actions" style="margin-bottom:17px">${student.submitted?'':'<button class="btn" id="switch-kind">'+(message?'Back to weekly check-in':'Send a separate message')+'</button>'}</div>
    <form>
    ${message?'':`<fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:9px">How are you feeling this week?</legend><div class="choices">${faces.slice(1).map((face,i)=>`<label><input type="radio" name="mood" value="${i+1}" required><span><b aria-hidden="true">${face}</b>${moods[i+1]}</span></label>`).join('')}</div></fieldset>`}
-   <label class="field">Would you like support?<select name="need" required><option value="none">No, thank you</option><option value="soon">Yes, when available</option><option value="urgent">Yes, as soon as possible</option></select></label>
+   <label class="field">Would you like support?<select name="need" required>${supportOptions}</select></label>
    <label class="field">What is this about? (optional)<select name="topic"><option value="">Choose a topic</option>${options(topics)}</select></label>
    <label class="field">${message?'What would you like to tell us?':'Anything else you want to share? (optional)'}<textarea name="note" maxlength="2000" ${message?'required':''} placeholder="A question, something that went well, or something you’d like help with"></textarea></label>
    <p class="muted">Your Gobeyond support team can read your response.</p><p class="error" role="alert"></p>
@@ -267,7 +397,7 @@ async function formPage(){
    try{
     if(message&&!input.note.trim())throw new Error('Enter a message before sending.');
     if(preview){
-     const mock=readDemo(), priority=input.need==='urgent'?'urgent':input.need==='soon'||message||Number(input.mood)<=2?'follow':'routine';
+     const mock=readDemo(), priority=feedbackPriority(kind,Number(input.mood),input.need);
      mock.feedback.unshift({...input,id:submissionId,week:currentWeek,student_id:'preview',name:'Sample submission',destination:'Demo',mood:message?null:Number(input.mood),priority,status:priority==='routine'?'resolved':'open',created_at:new Date().toISOString()});
      saveDemo(mock);
     }else await request('/api/submit',input);
@@ -279,14 +409,28 @@ async function formPage(){
  }
  form();
 }
+function showStaffInvite(invite){
+ history.replaceState(null,'',location.pathname);
+ app.innerHTML=`<main class="formpage">${brand}<section class="card formbody"><h1>Gobeyond staff access</h1>
+ <p class="sub" style="margin-bottom:16px">Open the staff workspace with your personal staff link.</p>
+ <form><p class="error" role="alert"></p><button class="btn primary">Open staff workspace</button></form></section></main>`;
+ const form=app.querySelector('form');
+ form.onsubmit=async event=>{
+  event.preventDefault();
+  form.querySelector('button').disabled=true;
+  try{await request('/api/staff/sign-in',{invite});location.replace('/');}
+  catch(error){showError(form,error);form.querySelector('button').disabled=false;}
+ };
+}
 async function boot(){
+ if(location.pathname==='/'&&location.hash.startsWith('#staff=')){showStaffInvite(location.hash.slice(7));return;}
  if(location.pathname==='/check-in'){await formPage();return;}
  if(new URLSearchParams(location.search).has('demo')){demo=true;data=readDemo();render();return;}
  app.innerHTML='<main class="formpage"><p>Loading student care workspace…</p></main>';
  try{data=await request('/api/data');}
  catch(error){
-  const signInLink=error.status===401?'<a class="btn primary" href="/signin-with-chatgpt?return_to=%2F" target="_top">Staff sign-in</a>':'';
-  app.innerHTML=`<main class="formpage">${brand}<section class="card formbody"><h1>Staff workspace</h1><p class="sub" style="margin-bottom:16px">${esc(error.message)}</p>${signInLink}</section></main>`;
+  const signInLink=error.status===401?'<a class="btn primary" href="/signin-with-chatgpt?return_to=%2F" target="_top">Sign in with ChatGPT</a>':'';
+  app.innerHTML=`<main class="formpage">${brand}<section class="card formbody"><h1>Staff workspace</h1><p class="sub" style="margin-bottom:16px">${esc(error.message)}</p><p class="muted">You can also open the personal staff sign-in link sent to your email.</p>${signInLink}</section></main>`;
   return;
  }
  render();

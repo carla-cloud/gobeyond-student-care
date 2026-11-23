@@ -10,7 +10,7 @@ Run `npm run dev` with Node.js 24 or later. The local preview uses a SQLite file
 
 ## Setting up access and integrations
 
-Set `STAFF_EMAILS` to the comma-separated list of staff email addresses. Staff sign in with ChatGPT. Students can open their personal links without an account when the Site allows public visitors. Treat personal links as credentials.
+Set `STAFF_EMAILS` to the comma-separated list of staff email addresses. Staff sign in with a personal email link or ChatGPT. Students can open their personal links without an account when the Site allows public visitors. Treat personal links as credentials.
 
 - `SHEET_WEBHOOK_URL` receives `{id,kind:"feedback",record}` immediately after a response is stored. Configure the receiving workflow to upsert on `record.id` and write text fields as literal text. The in-app register updates independently of provider availability.
 - `REMINDER_WEBHOOK_URL` receives `{id,kind:"weekly-reminder",week,to,name,subject,message,link}`. Configure the receiving workflow to send the supplied personal link to the intended student. Use the event ID to suppress duplicates.
@@ -24,3 +24,7 @@ Test with fictional records and a controlled delivery address before inviting st
 The Sheets owner can paste `integrations/google-sheets.gs` into **Extensions → Apps Script** from the destination workbook. In the script's **Project Settings → Script properties**, set `SPREADSHEET_ID` to the workbook ID and `SHEET_APPS_SCRIPT_SECRET` to a securely generated random secret of at least 32 bytes. In **Deploy → New deployment → Web app**, execute as the owner, allow **Anyone**, and authorize the script. The workbook keeps its separate sharing settings. The web app accepts only signed, recent requests.
 
 Use the deployment URL ending in `/exec` as the Site runtime variable `SHEET_APPS_SCRIPT_URL`. Set the matching `SHEET_APPS_SCRIPT_SECRET` as a secret in Sites and redeploy. Submit one test check-in and verify it adds a single row in **Responses**. The immediate path inserts new responses. Later support-status edits remain eligible for the scheduled sync.
+
+Staff can sign in with reusable personal email links. Issuance requires the Site's `STAFF_INVITE_SECRET` and an allowlisted recipient. A reusable link works until the recipient's access is removed or the signing secret changes. Each browser session expires after 30 days or upon sign-out. Keep sign-in links private.
+
+Staff can delete and restore student profiles and feedback from the CRM. Deleting a student pauses their check-ins and hides associated feedback until their profile is restored.

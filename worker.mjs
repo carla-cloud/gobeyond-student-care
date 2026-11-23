@@ -15,8 +15,9 @@ const text = value => typeof value === 'string' ? value.trim() : '';
 const headers = {'cache-control':'no-store','referrer-policy':'no-referrer','x-content-type-options':'nosniff'};
 const json = (body,status=200) => Response.json(body,{status,headers});
 const fail = (error,status=400) => json({error},status);
-const rosterSql = 'SELECT id,name,email,destination,start_date,end_date,token FROM students ORDER BY name';
-const rowsSql = 'SELECT f.*,s.name,s.destination FROM feedback f JOIN students s ON s.id=f.student_id ORDER BY created_at DESC';
+const rosterSql = 'SELECT id,name,email,destination,start_date,end_date,token FROM students WHERE deleted_at IS NULL ORDER BY name';
+const feedbackWithStudent='SELECT f.*,s.name,s.destination FROM feedback f JOIN students s ON s.id=f.student_id';
+const rowsSql=feedbackWithStudent+' WHERE f.deleted_at IS NULL AND s.deleted_at IS NULL ORDER BY f.created_at DESC';
 const all = async (db,sql,...args) => (await db.prepare(sql).bind(...args).all()).results;
 const first = (db,sql,...args) => db.prepare(sql).bind(...args).first();
 const run = (db,sql,...args) => db.prepare(sql).bind(...args).run();
@@ -75,8 +76,57 @@ async function deliver(db,destination,event) {
   return state;
 }
 
+function priorityFor(kind,mood,need) {
+  if (need==='urgent') return 'urgent';
+  if (need==='soon' || kind==='message' || mood<=2) return 'follow';
+  return 'routine';
+}
+
 function feedbackEvent(record) {
   return { id:'feedback:'+record.id,kind:'feedback',record };
+}
+
+const staffCookie='__Host-gobeyond-staff';
+const staffSessionAge=30*24*60*60;
+const staffCookieValue=(value,seconds)=>`${staffCookie}=${value}; Path=/; Max-Age=${seconds}; HttpOnly; Secure; SameSite=Lax`;
+const utf8=new TextEncoder();
+async function digest(value) {
+  const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',utf8.encode(value)));
+  return Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('');
+}
+function decodeUrlPart(value) {
+  return Uint8Array.from(atob(value.replaceAll('-','+').replaceAll('_','/')), c=>c.charCodeAt(0));
+}
+async function verifyInvite(invite,secret,allow) {
+  if (!secret || typeof invite!=='string' || !/^[a-z0-9_-]{30,1024}\.[a-z0-9_-]{43}$/i.test(invite)) return null;
+  try {
+    const [payload,signature]=invite.split('.');
+    const key=await crypto.subtle.importKey('raw',utf8.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['verify']);
+    if (!await crypto.subtle.verify('HMAC',key,decodeUrlPart(signature),utf8.encode(payload))) return null;
+    const {email,expiresAt,nonce,reusable}=JSON.parse(new TextDecoder().decode(decodeUrlPart(payload)));
+    const validLifetime=reusable===true || (Number.isSafeInteger(expiresAt) && expiresAt>Date.now());
+    if (!allow.includes(email) || !validLifetime || typeof nonce!=='string' || !/^[0-9a-f]{64}$/.test(nonce)) return null;
+    return {email,nonce,reusable:reusable===true};
+  } catch {
+    return null;
+  }
+}
+function browserSession(request) {
+  const cookie=request.headers.get('cookie')?.split(';').map(value=>value.trim()).find(value=>value.startsWith(staffCookie+'='));
+  const value=cookie?.slice(staffCookie.length+1);
+  return /^[0-9a-f]{64}$/.test(value||'') ? value : null;
+}
+async function staffSignIn(request,env,allow) {
+  const {invite}=await request.json();
+  const grant=await verifyInvite(invite,env.STAFF_INVITE_SECRET,allow);
+  if (!grant) return fail('This staff sign-in link is invalid or expired.',401);
+  const session=id().replaceAll('-','')+id().replaceAll('-','');
+  const expires=new Date(Date.now()+staffSessionAge*1000).toISOString();
+  const sessionDigest=await digest(session);
+  const replayKey=grant.reusable ? sessionDigest : await digest(grant.nonce);
+  const result=await run(env.DB,'INSERT OR IGNORE INTO staff_access VALUES (?,?,?,?)',replayKey,sessionDigest,grant.email,expires);
+  if (!result.meta.changes) return fail(grant.reusable?'Could not start a staff session. Try again.':'This staff sign-in link has already been used.',409);
+  return Response.json({signedIn:true},{headers:{...headers,'set-cookie':staffCookieValue(session,staffSessionAge)}});
 }
 
 async function api(request,env,ctx,url) {
@@ -88,22 +138,29 @@ async function api(request,env,ctx,url) {
   const email=request.headers.get('oai-authenticated-user-email')?.toLowerCase();
   const allow=String(env.STAFF_EMAILS||'').toLowerCase().split(',').map(s=>s.trim()).filter(Boolean);
   const signedIn=Boolean(request.headers.get('oai-authenticated-user-id'));
-  const staff=signedIn && allow.includes(email);
+  const nativeStaff=signedIn && allow.includes(email);
   const automation=Boolean(env.JOB_SECRET && request.headers.get('authorization')==='Bearer '+env.JOB_SECRET);
   if (method==='POST' && !automation && request.headers.get('origin')!==url.origin) return fail('Invalid request origin.',403);
 
   if (path==='/api/demo') return fail('Demo data is handled in the browser.',404);
   if (!db) return fail('The CRM database is unavailable.',503);
+  if (path==='/api/staff/sign-in' && method==='POST') return staffSignIn(request,env,allow);
+  const session=browserSession(request);
+  if (path==='/api/staff/sign-out' && method==='POST') {
+    if (session) await run(db,'UPDATE staff_access SET session_digest=NULL WHERE session_digest=?',await digest(session));
+    return Response.json({signedOut:true},{headers:{...headers,'set-cookie':staffCookieValue('',0)}});
+  }
+
 
   if (path==='/api/student' || path==='/api/submit') {
     if (method!=='POST') return fail('Method unavailable.',405);
     const input = await request.json();
     const token = text(input.token);
     if (!/^[0-9a-f]{64}$/i.test(token)) return fail('Ask your Gobeyond coordinator for your personal check-in link.',404);
-    const student = await first(db,'SELECT id,name,start_date,end_date FROM students WHERE token=?',token);
+    const student = await first(db,'SELECT id,name,start_date,end_date FROM students WHERE token=? AND deleted_at IS NULL',token);
     if (!student) return fail('Ask your Gobeyond coordinator for your personal check-in link.',404);
     if (student.start_date>day || student.end_date<day) return fail('This check-in link is outside your program dates.',409);
-    const existing=await first(db,"SELECT id FROM feedback WHERE student_id=? AND week=? AND kind='check-in'",student.id,week);
+    const existing=await first(db,"SELECT id FROM feedback WHERE student_id=? AND week=? AND kind='check-in' AND deleted_at IS NULL",student.id,week);
     if (path==='/api/student') return json({name:student.name,week,submitted:!!existing});
     const kind=input.kind, mood=Number(input.mood), need=input.need, topic=text(input.topic), note=text(input.note);
     if (!['check-in','message'].includes(kind) || !needs.includes(need) || (topic && !topics.includes(topic)) ||
@@ -112,23 +169,30 @@ async function api(request,env,ctx,url) {
     if (kind==='check-in' && existing) return fail('Your check-in for this week is already saved.',409);
     const submissionId=text(input.id);
     if (!/^[0-9a-f-]{36}$/i.test(submissionId)) return fail('Reload the form and try again.');
-    const priority = need==='urgent' ? 'urgent' : need==='soon'||kind==='message'||mood<=2 ? 'follow' : 'routine';
+    const priority=priorityFor(kind,mood,need);
     await run(db,`INSERT OR IGNORE INTO feedback
       (id,student_id,week,kind,mood,need,topic,note,priority,status,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,submissionId,student.id,week,kind,kind==='message'?null:mood,need,topic,note,priority,priority==='routine'?'resolved':'open',now());
-    const record=await first(db,'SELECT f.*,s.name,s.destination FROM feedback f JOIN students s ON s.id=f.student_id WHERE f.id=? AND f.student_id=?',submissionId,student.id);
+      SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM students WHERE id=? AND deleted_at IS NULL)`,
+      submissionId,student.id,week,kind,kind==='message'?null:mood,need,topic,note,priority,priority==='routine'?'resolved':'open',now(),student.id);
+    const record=await first(db,'SELECT f.*,s.name,s.destination FROM feedback f JOIN students s ON s.id=f.student_id WHERE f.id=? AND f.student_id=? AND f.deleted_at IS NULL AND s.deleted_at IS NULL',submissionId,student.id);
     if (!record) return fail('A check-in for this week already exists. Reload to send a separate message.',409);
     if (sheet) ctx.waitUntil(deliver(db,sheet,feedbackEvent(record)).catch(()=>{}));
     return json({saved:true,priority:record.priority});
   }
 
+  const access=session && env.STAFF_INVITE_SECRET
+    ? await first(db,'SELECT email FROM staff_access WHERE session_digest=? AND expires_at>?',await digest(session),now())
+    : null;
+  const invitedStaff=!!access && allow.includes(access.email);
+  const staff=nativeStaff || invitedStaff;
   if (path==='/api/jobs' && method==='POST' && (staff||automation)) {
     const origin=url.origin;
-    const eligible=await all(db,`SELECT s.* FROM students s WHERE start_date<=? AND end_date>=?
-      AND NOT EXISTS(SELECT 1 FROM feedback f WHERE f.student_id=s.id AND f.kind='check-in' AND f.week=?)
+    const eligible=await all(db,`SELECT s.* FROM students s WHERE s.deleted_at IS NULL AND start_date<=? AND end_date>=?
+      AND NOT EXISTS(SELECT 1 FROM feedback f WHERE f.student_id=s.id AND f.kind='check-in' AND f.week=? AND f.deleted_at IS NULL)
       AND NOT EXISTS(SELECT 1 FROM delivery d WHERE d.id='reminder:'||s.id||':'||? AND d.state='sent') LIMIT 25`,day,day,week,week);
     const pending=await all(db,`SELECT f.*,s.name,s.destination FROM feedback f JOIN students s ON s.id=f.student_id
-      WHERE NOT EXISTS(SELECT 1 FROM delivery d WHERE d.id='feedback:'||f.id AND d.state='sent') ORDER BY f.created_at LIMIT 25`);
+      WHERE f.deleted_at IS NULL AND s.deleted_at IS NULL
+      AND NOT EXISTS(SELECT 1 FROM delivery d WHERE d.id='feedback:'||f.id AND d.state='sent') ORDER BY f.created_at LIMIT 25`);
     const outcomes=[];
     for(const [destination,events] of [
       [env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET?{url:env.REMINDER_WEBHOOK_URL,secret:env.WEBHOOK_SECRET}:null,eligible.map(s=>({id:'reminder:'+s.id+':'+week,kind:'weekly-reminder',week,to:s.email,name:s.name,
@@ -145,28 +209,80 @@ async function api(request,env,ctx,url) {
   if (!staff) return fail(signedIn ? 'Staff access is required.' : 'Sign in to open the staff workspace.',signedIn ? 403 : 401);
 
   if (path==='/api/data' && method==='GET') {
-    const [students,feedback]=await Promise.all([all(db,rosterSql),all(db,rowsSql)]);
+    const [students,feedback,deletedStudents,deletedFeedback]=await Promise.all([
+      all(db,rosterSql),all(db,rowsSql),
+      all(db,'SELECT id,name,email,destination,start_date,end_date,deleted_at FROM students WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC'),
+      all(db,feedbackWithStudent+' WHERE f.deleted_at IS NOT NULL AND s.deleted_at IS NULL ORDER BY f.deleted_at DESC')
+    ]);
     const sheetUrl = typeof env.GOOGLE_SHEET_URL === 'string' &&
       /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[A-Za-z0-9_-]+\/edit$/.test(env.GOOGLE_SHEET_URL)
       ? env.GOOGLE_SHEET_URL : null;
-    return json({students,feedback,day,week,integrations:{
+    return json({students,feedback,deletedStudents,deletedFeedback,day,week,staffSession:invitedStaff,integrations:{
       sheet:!!sheet, sheetUrl,
       reminder:!!(env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET),
       reminderScheduled:env.WEEKLY_EMAIL_SCHEDULE==='daily'}});
   }
-  if (path==='/api/students' && method==='POST') {
-    const input=await request.json();
+  if ((path==='/api/students' || path==='/api/students/update') && method==='POST') {
+    const input=await request.json() || {};
     const name=text(input.name), address=text(input.email).toLowerCase(), destination=text(input.destination), start=text(input.start_date), end=text(input.end_date);
     if (!name||name.length>100||!destination||destination.length>120||address.length>254||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)||!validDate(start)||!validDate(end)||start>end) return fail('Check the student details and program dates.');
     const token=id().replaceAll('-','')+id().replaceAll('-','');
-    const result=await run(db,'INSERT OR IGNORE INTO students VALUES (?,?,?,?,?,?,?)',id(),name,address,destination,start,end,token);
-    return result.meta.changes ? json({saved:true},201) : fail('This student email already exists.',409);
+    if (path==='/api/students/update') {
+      const studentId=text(input.id);
+      const result=await run(db,`UPDATE OR IGNORE students SET name=?, email=?, destination=?, start_date=?, end_date=?,
+        token=CASE WHEN email<>? THEN ? ELSE token END WHERE id=? AND deleted_at IS NULL`,
+        name,address,destination,start,end,address,token,studentId);
+      if (result.meta.changes) return json({saved:true});
+      const existing=await first(db,'SELECT id FROM students WHERE id=? AND deleted_at IS NULL',studentId);
+      return existing ? fail('This student email already exists.',409) : fail('The student record was not found.',404);
+    }
+    const result=await run(db,'INSERT OR IGNORE INTO students (id,name,email,destination,start_date,end_date,token) VALUES (?,?,?,?,?,?,?)',id(),name,address,destination,start,end,token);
+    if (result.meta.changes) return json({saved:true},201);
+    const removed=await first(db,'SELECT id FROM students WHERE email=? AND deleted_at IS NOT NULL',address);
+    return fail(removed?'This student is in Recently deleted. Restore them to use this email.':'This student email already exists.',409);
+  }
+  const removal=path.match(/^\/api\/(students|feedback)\/(delete|restore)$/);
+  if (removal && method==='POST') {
+    const [,table,action]=removal;
+    const {id:recordId}=await request.json() || {};
+    if (typeof recordId!=='string' || !recordId) return fail('Choose a record.');
+    const deleting=action==='delete';
+    const allowedParent=table==='feedback'?' AND student_id IN (SELECT id FROM students WHERE deleted_at IS NULL)':'';
+    const result=await run(db,`UPDATE OR IGNORE ${table} SET deleted_at=? WHERE id=?${allowedParent}`,
+      deleting?now():null,recordId);
+    if (result.meta.changes) return json({saved:true});
+    const record=await first(db,`SELECT id FROM ${table} WHERE id=?${allowedParent}`,recordId);
+    return record ? fail('This student already has a check-in for that week.',409) : fail('The record was not found.',404);
+  }
+  if (path==='/api/feedback/update' && method==='POST') {
+    const input=await request.json() || {};
+    const recordId=text(input.id);
+    const record=await first(db,'SELECT kind FROM feedback WHERE id=? AND deleted_at IS NULL AND student_id IN (SELECT id FROM students WHERE deleted_at IS NULL)',recordId);
+    if (!record) return fail('The feedback record was not found.',404);
+    const {kind}=record;
+    const mood=kind==='check-in'?Number(input.mood):null;
+    const need=input.need, topic=text(input.topic), note=text(input.note);
+    if (!needs.includes(need) || (topic && !topics.includes(topic)) || note.length>2000 ||
+        (kind==='check-in' && (!Number.isInteger(mood)||mood<1||mood>5)) ||
+        (kind==='message' && !note)) return fail('Please complete the required fields.');
+    const priority=priorityFor(kind,mood,need);
+    const changed='id=? AND deleted_at IS NULL AND student_id IN (SELECT id FROM students WHERE deleted_at IS NULL) AND (mood IS NOT ? OR need IS NOT ? OR topic IS NOT ? OR note IS NOT ?)';
+    const fields=[recordId,mood,need,topic,note];
+    await db.batch([
+      db.prepare(`INSERT INTO feedback_edits SELECT ?, id, ?, ?, mood, need, topic, note, priority, status
+        FROM feedback WHERE ${changed}`).bind(id(),now(),nativeStaff?email:access.email,...fields),
+      db.prepare(`UPDATE feedback SET mood=?, need=?, topic=?, note=?, priority=?,
+        status=CASE WHEN ?='routine' THEN 'resolved'
+          WHEN priority='routine' OR (?='urgent' AND priority<>'urgent' AND status='resolved') THEN 'open'
+          ELSE status END WHERE ${changed}`).bind(mood,need,topic,note,priority,priority,priority,...fields)
+    ]);
+    return json({saved:true});
   }
   if (path==='/api/status' && method==='POST') {
     const input=await request.json();
     if (!statuses.includes(input.status)||typeof input.id!=='string') return fail('Choose a valid status.');
-    const result=await run(db,'UPDATE feedback SET status=? WHERE id=?',input.status,input.id);
+    const result=await run(db,'UPDATE feedback SET status=? WHERE id=? AND deleted_at IS NULL AND student_id IN (SELECT id FROM students WHERE deleted_at IS NULL)',input.status,input.id);
     return result.meta.changes ? json({saved:true}) : fail('The feedback record was not found.',404);
   }
   return fail('This page does not exist.',404);
