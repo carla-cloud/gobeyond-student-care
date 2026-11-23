@@ -206,7 +206,18 @@ const IT={
  'Booked':'Prenotato',
  'Cancelled':'Annullato',
  'Cancel':'Annulla',
- 'No consultant slots from today onward.':'Nessun orario dei consulenti da oggi in poi.',
+ 'Day':'Giorno',
+ 'Previous month':'Mese precedente',
+ 'Next month':'Mese successivo',
+ 'Available: {count}':'Disponibili: {count}',
+ 'No times':'Nessun orario',
+ 'Choose a day with available times. Days with times are marked with a dot.':'Scegli un giorno con orari disponibili. I giorni con orari sono indicati da un punto.',
+ 'Choose a consultant to see their times.':'Scegli un consulente per vedere i suoi orari.',
+ 'No times for {name} on this day.':'Nessun orario per {name} in questo giorno.',
+ 'Selected: {day} at {time} with {name}':'Selezionato: {day} alle {time} con {name}',
+ 'Available times':'Orari disponibili',
+ 'Booked calls':'Chiamate prenotate',
+ 'Consultants for this day':'Consulenti per questo giorno',
  'Cancel appointment?':'Annullare l’appuntamento?',
  '{student} with {consultant}, {day} at {time} (Italian time).':'{student} con {consultant}, {day} alle {time} (ora italiana).',
  'The student is not notified automatically, and this time will not be offered again.':'Lo studente non viene avvisato automaticamente e questo orario non verrà più proposto.',
@@ -217,7 +228,6 @@ const IT={
  'Loading available times…':'Caricamento degli orari disponibili…',
  'Available times could not be loaded. Your team will contact you.':'Non è stato possibile caricare gli orari disponibili. Il tuo team ti contatterà.',
  'No times are available right now. Your team will contact you.':'Al momento non ci sono orari disponibili. Il tuo team ti contatterà.',
- 'with {name}':'con {name}',
  '{time} your time':'{time} ora locale',
  'No call for now':'Per ora nessuna chiamata',
  'Call booked with {name}':'Chiamata prenotata con {name}',
@@ -361,8 +371,46 @@ function exampleSlots(){
  for(let offset=1;days.length<3;offset++){const date=dateAfter(offset);const weekday=new Date(date+'T12:00:00Z').getUTCDay();if(weekday!==0&&weekday!==6)days.push(date);}
  return days.flatMap(date=>consultantList.flatMap(([key,name,phone])=>exampleTimes[key].map(time=>{
   const starts_at=italianTime(date,time);
-  return {id:key+'-'+date+'-'+time.replace(':',''),starts_at,ends_at:new Date(Date.parse(starts_at)+30*60000).toISOString(),status:'open',consultant_name:name,consultant_phone:phone,student_name:null,feedback_id:null,note:null};
+  return {id:key+'-'+date+'-'+time.replace(':',''),consultant_id:key,starts_at,ends_at:new Date(Date.parse(starts_at)+30*60000).toISOString(),status:'open',consultant_name:name,consultant_phone:phone,student_name:null,feedback_id:null,note:null};
  })));
+}
+// Booking calendar, shared by the student form and the staff Calendar page:
+// pick a day on a month grid, then a consultant, then see that consultant's times (all in Italian time).
+const consultantOf=s=>s.consultant_id||consultantList.find(([,name])=>name===s.consultant_name)?.[0];
+const dayOf=date=>date+'T12:00:00Z';
+function dayCounts(slots){
+ const counts={};
+ for(const s of slots){const key=callDay(s.starts_at);(counts[key]??={open:0,booked:0,cancelled:0})[s.status]++;}
+ return counts;
+}
+function monthGrid({month,selected,counts,disabled=()=>false}){
+ const [y,m]=month.split('-').map(Number);
+ const first=new Date(Date.UTC(y,m-1,1));
+ const blanks=(first.getUTCDay()+6)%7;
+ const length=new Date(Date.UTC(y,m,0)).getUTCDate();
+ const today=callDay(new Date().toISOString());
+ const shift=delta=>new Date(Date.UTC(y,m-1+delta,1)).toISOString().slice(0,7);
+ const weekdays=[0,1,2,3,4,5,6].map(i=>new Intl.DateTimeFormat(locale(),{weekday:'short',timeZone:'UTC'}).format(new Date(Date.UTC(2024,0,1+i))));
+ const heading=capital(new Intl.DateTimeFormat(locale(),{month:'long',year:'numeric',timeZone:'UTC'}).format(first));
+ const cells=[];
+ for(let dd=1;dd<=length;dd++){
+  const date=month+'-'+String(dd).padStart(2,'0');
+  const {open=0,booked=0}=counts[date]||{};
+  const off=disabled(date);
+  cells.push(`<button type="button" class="cal-day${date===selected?' selected':''}${date===today?' today':''}" data-cal-day="${date}" aria-pressed="${date===selected}" aria-label="${callDayLabel(dayOf(date))}: ${t('Available: {count}',{count:open})}" ${off?'disabled':''}>${dd}<span class="cal-dots" aria-hidden="true">${open?'<i class="dot open"></i>':''}${booked?'<i class="dot booked"></i>':''}</span></button>`);
+ }
+ return `<div class="cal"><div class="cal-head"><button type="button" class="cal-nav" data-cal-month="${shift(-1)}" aria-label="${t('Previous month')}">‹</button><b>${heading}</b><button type="button" class="cal-nav" data-cal-month="${shift(1)}" aria-label="${t('Next month')}">›</button></div>
+ <div class="cal-grid">${weekdays.map(w=>`<span class="cal-weekday" aria-hidden="true">${w}</span>`).join('')}${'<span></span>'.repeat(blanks)}${cells.join('')}</div></div>`;
+}
+// After a re-render, put keyboard focus back on the equivalent calendar control.
+function refocus(clicked,root){
+ const nav=clicked.classList.contains('cal-nav')?[...root.querySelectorAll('.cal-nav')].indexOf(clicked):-1;
+ const [key]=Object.keys(clicked.dataset);
+ return ()=>{
+  const scope=root.isConnected?root:document;
+  const target=nav>=0?scope.querySelectorAll('.cal-nav')[nav]:key&&scope.querySelector(`[data-${key.replace(/[A-Z]/g,c=>'-'+c.toLowerCase())}="${CSS.escape(clicked.dataset[key])}"]`);
+  target?.focus();
+ };
 }
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const capital=value=>value.charAt(0).toUpperCase()+value.slice(1);
@@ -403,7 +451,7 @@ const exampleData=()=>{
   feedback,slots,day,week:currentWeek,integrations:{sheet:false,reminder:false}
  };
 };
-const demoKey='gobeyond-demo-v3';
+const demoKey='gobeyond-demo-v4';
 function readDemo(){
  try {const data=JSON.parse(localStorage.getItem(demoKey));if(data?.week===currentWeek) return data;}catch{}
  return exampleData();
@@ -465,21 +513,36 @@ function overview(){
  <div class="card"><div class="card-head"><div><h2>${t('Support queue')}</h2><p>${t('Students who may need help')}</p></div></div><div class="queue">${open.length?open.slice(0,5).map(r=>`<button class="queue-item" data-record="${esc(r.id)}">${avatar(r.name)}<span class="copy"><b>${esc(r.name)}</b><small>${esc(queueReason(r))}</small></span>${pill(r)}</button>`).join(''):`<p class="empty">${t('No open follow-ups.')}</p>`}</div></div>
  </section>`;
 }
-// Staff calendar: consultant slots from today onward, grouped by day (Italian time).
+// Staff calendar: pick a day on the month grid, then a consultant, then see that consultant's slots for the day.
+let calDay='',calConsultant='',calMonth='';
 function calendarView(){
  const today=callDay(new Date().toISOString());
- const slots=(data.slots||[]).filter(s=>callDay(s.starts_at)>=today).sort((a,b)=>a.starts_at.localeCompare(b.starts_at)||a.consultant_name.localeCompare(b.consultant_name));
- const total=status=>slots.filter(s=>s.status===status).length;
- const days=[...new Set(slots.map(s=>callDay(s.starts_at)))];
+ const slots=(data.slots||[]).slice().sort((a,b)=>a.starts_at.localeCompare(b.starts_at)||a.consultant_name.localeCompare(b.consultant_name));
+ const upcoming=slots.filter(s=>callDay(s.starts_at)>=today);
+ const total=status=>upcoming.filter(s=>s.status===status).length;
+ const counts=dayCounts(slots);
+ calDay||=Object.keys(counts).filter(date=>date>=today).sort()[0]||today;
+ calMonth||=calDay.slice(0,7);
+ const people=consultantsOf();
+ const daySlots=slots.filter(s=>callDay(s.starts_at)===calDay);
+ const consultantButtons=people.map(c=>{
+  const mine=daySlots.filter(s=>consultantOf(s)===c.id);
+  const count=status=>mine.filter(s=>s.status===status).length;
+  return `<button type="button" class="consultant-btn${calConsultant===c.id?' selected':''}" data-cal-consultant="${esc(c.id)}" aria-pressed="${calConsultant===c.id}"><b>${esc(c.name)}</b><small>${esc(c.phone)}</small><small>${mine.length?`${slotLabel('open')}: ${count('open')} · ${slotLabel('booked')}: ${count('booked')}${count('cancelled')?` · ${slotLabel('cancelled')}: ${count('cancelled')}`:''}`:t('No times')}</small></button>`;
+ }).join('');
+ const person=people.find(c=>c.id===calConsultant);
  const action=s=>s.status==='booked'?`<span class="cell-sub"><button class="row-link danger" data-cancel-slot="${esc(s.id)}">${t('Cancel')}</button></span>`
   :s.status==='open'?`<span class="cell-sub"><button class="row-link muted-link" data-remove-slot="${esc(s.id)}">${t('Remove')}</button></span>`:'';
- const row=s=>`<tr class="slot-${s.status}"><td><b>${callTime(s.starts_at)}–${callTime(s.ends_at)}</b></td><td><b>${esc(s.consultant_name)}</b><span class="cell-sub">${phoneLink(s.consultant_phone)}</span></td><td><span class="pill ${slotClass(s.status)}">${slotLabel(s.status)}</span>${action(s)}</td><td class="student-cell">${s.student_name?esc(s.student_name):'—'}</td><td class="note-cell">${s.status==='open'?'—':esc(s.note)||t('No written comment.')}</td></tr>`;
+ const row=s=>`<tr class="slot-${s.status}"><td><b>${callTime(s.starts_at)}–${callTime(s.ends_at)}</b></td><td><span class="pill ${slotClass(s.status)}">${slotLabel(s.status)}</span>${action(s)}</td><td class="student-cell">${s.student_name?esc(s.student_name):'—'}</td><td class="note-cell">${s.status==='open'?'—':esc(s.note)||t('No written comment.')}</td></tr>`;
+ const detailCard=person
+  ?`<section class="card"><div class="card-head"><div><h2>${esc(person.name)} · ${callDayLabel(dayOf(calDay))}</h2><p>${phoneLink(person.phone)}</p></div></div>${table(['Time','Status','Student','Check-in note'],daySlots.filter(s=>consultantOf(s)===person.id).map(row),t('No times for {name} on this day.',{name:esc(person.name)}))}</section>`
+  :`<section class="card"><p class="empty">${t('Choose a consultant to see their times.')}</p></section>`;
  return title('Calendar','Consultant calls booked by students who asked for urgent support.',btn('Add availability','add-slots','plus',true))+
-  `<div class="calendar-legend">${['open','booked','cancelled'].map(status=>`<span class="pill ${slotClass(status)}">${slotLabel(status)}: ${total(status)}</span>`).join('')}<span class="muted">${t('Times are in Italian time.')}</span><span class="calendar-status" id="page-status" role="status"></span></div>`+
-  (days.length?days.map(key=>{
-   const list=slots.filter(s=>callDay(s.starts_at)===key);
-   return `<section class="card calendar-day"><div class="card-head"><h2>${callDayLabel(list[0].starts_at)}</h2></div>${table(['Time','Consultant','Status','Student','Check-in note'],list.map(row))}</section>`;
-  }).join(''):`<section class="card"><p class="empty">${t('No consultant slots from today onward.')}</p></section>`);
+  `<div class="calendar-legend">${['open','booked','cancelled'].map(status=>`<span class="pill ${slotClass(status)}">${slotLabel(status)}: ${total(status)}</span>`).join('')}<span class="muted">${t('Times are in Italian time.')}</span><span class="calendar-status" id="page-status" role="status"></span></div>
+  <section class="calendar-layout">
+   <div class="card cal-card">${monthGrid({month:calMonth,selected:calDay,counts})}<p class="cal-key"><span><i class="dot open"></i>${t('Available times')}</span><span><i class="dot booked"></i>${t('Booked calls')}</span></p></div>
+   <div class="card day-card"><div class="card-head"><div><h2>${callDayLabel(dayOf(calDay))}</h2><p>${t('Consultants for this day')}</p></div></div><div class="consultant-list">${consultantButtons}</div></div>
+  </section>${detailCard}`;
 }
 // Confirmation dialog for calendar actions; `apply` does the change (sample data or server).
 function confirmDialog(heading,summary,warning,confirmLabel,keepLabel,apply){
@@ -529,8 +592,8 @@ const consultantsOf=()=>data.consultants||consultantList.map(([id,name,phone])=>
 function availabilityDialog(){
  const people=consultantsOf();
  openDialog(t('Add consultant availability'),`<form>
-  <label class="field">${t('Consultant')}<select name="consultant_id" required>${people.map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · ${esc(c.phone)}</option>`).join('')}</select></label>
-  <label class="field">${t('Date')}<input name="date" type="date" required min="${callDay(new Date().toISOString())}" value="${dateAfter(1)}"></label>
+  <label class="field">${t('Consultant')}<select name="consultant_id" required>${people.map(c=>`<option value="${esc(c.id)}" ${c.id===calConsultant?'selected':''}>${esc(c.name)} · ${esc(c.phone)}</option>`).join('')}</select></label>
+  <label class="field">${t('Date')}<input name="date" type="date" required min="${callDay(new Date().toISOString())}" value="${calDay&&calDay>=callDay(new Date().toISOString())?calDay:dateAfter(1)}"></label>
   <div class="field-row"><label class="field">${t('From')}<input name="from" type="time" step="300" required value="09:00"></label><label class="field">${t('To')}<input name="to" type="time" step="300" required value="12:00"></label></div>
   <label class="field">${t('Call length')}<select name="minutes">${callLengths.map(n=>`<option value="${n}" ${n===30?'selected':''}>${t('{n} minutes',{n})}</option>`).join('')}</select></label>
   <p class="slot-preview" id="slot-preview"></p>
@@ -557,14 +620,16 @@ function availabilityDialog(){
     const times=rangeTimes(v.from,v.to,minutes);
     if(!times.length)throw new Error('The time range is shorter than one call.');
     if(times.length>24)throw new Error('Add at most 24 times at once.');
-    const added=times.map(time=>{const starts_at=italianTime(v.date,time);return {id:crypto.randomUUID(),starts_at,ends_at:new Date(Date.parse(starts_at)+minutes*60000).toISOString(),status:'open',consultant_name:person.name,consultant_phone:person.phone,student_name:null,feedback_id:null,note:null};});
+    const added=times.map(time=>{const starts_at=italianTime(v.date,time);return {id:crypto.randomUUID(),consultant_id:person.id,starts_at,ends_at:new Date(Date.parse(starts_at)+minutes*60000).toISOString(),status:'open',consultant_name:person.name,consultant_phone:person.phone,student_name:null,feedback_id:null,note:null};});
     if(added[0].starts_at<=new Date().toISOString())throw new Error('Choose times in the future.');
-    if(data.slots.some(s=>s.consultant_name===person.name&&s.status!=='cancelled'&&s.starts_at<added.at(-1).ends_at&&s.ends_at>added[0].starts_at))throw new Error('Some of these times overlap with this consultant’s existing availability.');
+    if(data.slots.some(s=>consultantOf(s)===person.id&&s.status!=='cancelled'&&s.starts_at<added.at(-1).ends_at&&s.ends_at>added[0].starts_at))throw new Error('Some of these times overlap with this consultant’s existing availability.');
     data.slots.push(...added);saveDemo(data);count=added.length;
    }else{
     count=(await request('/api/slots/add',{...v,minutes:Number(v.minutes)})).added;
     data=await request('/api/data');
    }
+   // Show the day and consultant that just got the new times.
+   calDay=v.date;calMonth=v.date.slice(0,7);calConsultant=v.consultant_id;
    detail.close();render();
    document.querySelector('#page-status').textContent=t('Times added: {count}.',{count});
   }catch(error){showError(form,error);}
@@ -691,6 +756,16 @@ app.addEventListener('click',async event=>{
  if(views.some(([key])=>key===action)){view=action;search='';filter='all';render();return;}
  if(action==='add')addDialog();
  if(action==='add-slots')availabilityDialog();
+ // Staff calendar: month arrows, day, consultant.
+ const {calMonth:month,calDay:pickedDay,calConsultant:pickedConsultant}=button.dataset;
+ if(month||pickedDay||pickedConsultant){
+  if(month)calMonth=month;
+  if(pickedDay){calDay=pickedDay;calMonth=pickedDay.slice(0,7);}
+  if(pickedConsultant)calConsultant=pickedConsultant;
+  const restore=refocus(button,app);
+  render();restore();
+  return;
+ }
  if(button.dataset.removeSlot){
   const slot=(data.slots||[]).find(s=>s.id===button.dataset.removeSlot);
   if(slot)removeSlotDialog(slot);
@@ -735,13 +810,18 @@ async function formPage(){
  if(student.submitted)kind='message';
  let submissionId=crypto.randomUUID();
  // Optional consultant call booking, offered when the student answers "Yes, it's urgent".
- let slotsState='idle',slotList=[],chosenSlot='';
- const loadSlots=async()=>(preview
-  ?readDemo().slots.filter(s=>s.status==='open'&&s.starts_at>new Date().toISOString())
-  :(await request('/api/slots',{token})).slots).sort((a,b)=>a.starts_at.localeCompare(b.starts_at)||a.consultant_name.localeCompare(b.consultant_name));
+ // Order: pick a day on the calendar -> pick a consultant -> pick one of their times. The chosen slot travels in a hidden field.
+ let slotsState='idle',slotList=[],slotPeople=[],chosenSlot='',pickDay='',pickConsultant='',viewMonth='';
+ async function loadSlots(){
+  const {slots,consultants}=preview
+   ?{slots:readDemo().slots.filter(s=>s.status==='open'&&s.starts_at>new Date().toISOString()),consultants:consultantList.map(([id,name])=>({id,name}))}
+   :await request('/api/slots',{token});
+  // Everything offered to students is open (the server only sends open slots, without a status field).
+  return {consultants,slots:slots.map(s=>({...s,status:'open'})).sort((a,b)=>a.starts_at.localeCompare(b.starts_at)||a.consultant_name.localeCompare(b.consultant_name))};
+ }
  function fetchSlots(){
   slotsState='loading';
-  loadSlots().then(list=>{slotList=list;slotsState='ready';}).catch(()=>{slotList=[];slotsState='error';})
+  loadSlots().then(result=>{slotList=result.slots;slotPeople=result.consultants;slotsState='ready';}).catch(()=>{slotList=[];slotsState='error';})
    .finally(()=>{const box=document.querySelector('#booking');if(box&&!box.hidden)box.innerHTML=slotPicker();});
  }
  function slotPicker(){
@@ -750,14 +830,45 @@ async function formPage(){
   if(slotsState==='loading')return head+`<p class="muted">${t('Loading available times…')}</p>`;
   if(slotsState==='error')return head+`<p class="muted">${t('Available times could not be loaded. Your team will contact you.')}</p>`;
   if(!slotList.length)return head+`<p class="muted">${t('No times are available right now. Your team will contact you.')}</p>`;
-  const days=[...new Set(slotList.map(s=>callDay(s.starts_at)))];
-  return head+days.map(key=>{
-   const list=slotList.filter(s=>callDay(s.starts_at)===key);
-   return `<div class="slot-day"><b>${callDayLabel(list[0].starts_at)}</b><div class="slot-grid">${list.map(s=>{
-    const local=localCallTime(s.starts_at);
-    return `<label><input type="radio" name="slot" value="${esc(s.id)}" ${chosenSlot===s.id?'checked':''}><span><b>${callTime(s.starts_at)}</b><small>${t('with {name}',{name:esc(s.consultant_name)})}</small>${local?`<small>${esc(local)}</small>`:''}</span></label>`;
-   }).join('')}</div></div>`;
-  }).join('')+`<label class="slot-skip"><input type="radio" name="slot" value=""><span>${t('No call for now')}</span></label>`;
+  if(chosenSlot&&!slotList.some(s=>s.id===chosenSlot))chosenSlot='';
+  const counts=dayCounts(slotList);
+  if(pickDay&&!counts[pickDay])pickDay='';
+  viewMonth||=(pickDay||callDay(slotList[0].starts_at)).slice(0,7);
+  const people=slotPeople.length?slotPeople:[...new Map(slotList.map(s=>[consultantOf(s),{id:consultantOf(s),name:s.consultant_name}])).values()];
+  const daySlots=pickDay?slotList.filter(s=>callDay(s.starts_at)===pickDay):[];
+  const consultantStep=pickDay
+   ?`<div class="pick-step"><b>${t('Consultant')}</b><div class="consultant-list">${people.map(c=>{
+     const count=daySlots.filter(s=>consultantOf(s)===c.id).length;
+     return `<button type="button" class="consultant-btn${pickConsultant===c.id?' selected':''}" data-cal-consultant="${esc(c.id)}" aria-pressed="${pickConsultant===c.id}" ${count?'':'disabled'}><b>${esc(c.name)}</b><small>${count?t('Available: {count}',{count}):t('No times')}</small></button>`;
+    }).join('')}</div></div>`
+   :`<p class="muted pick-hint">${t('Choose a day with available times. Days with times are marked with a dot.')}</p>`;
+  const person=people.find(c=>c.id===pickConsultant);
+  const times=pickDay&&person?daySlots.filter(s=>consultantOf(s)===person.id):[];
+  const timeStep=!pickDay?'':!person?`<p class="muted pick-hint">${t('Choose a consultant to see their times.')}</p>`
+   :`<div class="pick-step"><b>${t('Time')}</b>${times.length?`<div class="slot-grid">${times.map(s=>{
+     const local=localCallTime(s.starts_at);
+     return `<button type="button" class="slot-btn${chosenSlot===s.id?' selected':''}" data-cal-slot="${esc(s.id)}" aria-pressed="${chosenSlot===s.id}"><b>${callTime(s.starts_at)}</b>${local?`<small>${esc(local)}</small>`:''}</button>`;
+    }).join('')}</div>`:`<p class="muted">${t('No times for {name} on this day.',{name:esc(person.name)})}</p>`}</div>`;
+  const chosen=slotList.find(s=>s.id===chosenSlot);
+  const summary=chosen?`<p class="pick-summary" role="status">${t('Selected: {day} at {time} with {name}',{day:callDayLabel(chosen.starts_at,false),time:callTime(chosen.starts_at),name:esc(chosen.consultant_name)})}<button type="button" class="row-link" data-cal-clear="1">${t('No call for now')}</button></p>`:'';
+  return head+`<input type="hidden" name="slot" value="${esc(chosenSlot)}"><div class="pick-layout"><div class="pick-step"><b>${t('Day')}</b>${monthGrid({month:viewMonth,selected:pickDay,counts,disabled:date=>!counts[date]?.open})}</div><div>${consultantStep}${timeStep}</div></div>${summary}`;
+ }
+ // Clicks inside the booking box: change month, day, consultant or time, then redraw the box.
+ function wireBooking(box){
+  box.addEventListener('click',event=>{
+   const button=event.target.closest('button');
+   if(!button||!box.contains(button))return;
+   const {calMonth,calDay,calConsultant,calSlot,calClear}=button.dataset;
+   if(calMonth)viewMonth=calMonth;
+   else if(calDay){pickDay=calDay;viewMonth=calDay.slice(0,7);}
+   else if(calConsultant)pickConsultant=calConsultant;
+   else if(calSlot)chosenSlot=calSlot;
+   else if(calClear)chosenSlot='';
+   else return;
+   const restore=refocus(button,box);
+   box.innerHTML=slotPicker();
+   restore();
+  });
  }
  function demoBook(slotId,record){
   const mock=readDemo();
@@ -782,7 +893,7 @@ async function formPage(){
   document.querySelector('#another').onclick=()=>{submissionId=crypto.randomUUID();kind='message';form();};
   const rebook=document.querySelector('#rebook');
   if(!rebook)return;
-  rebook.addEventListener('change',event=>{if(event.target.name==='slot')chosenSlot=event.target.value;});
+  wireBooking(rebook.querySelector('#booking'));
   document.querySelector('#skip-call').onclick=()=>thanks(message,null,record);
   rebook.onsubmit=async event=>{
    event.preventDefault();
@@ -825,10 +936,8 @@ async function formPage(){
    bookingBox.hidden=element.elements.need.value!=='urgent';
    if(!bookingBox.hidden)bookingBox.innerHTML=slotPicker();
   };
-  element.addEventListener('change',event=>{
-   if(event.target.name==='need')syncBooking();
-   if(event.target.name==='slot')chosenSlot=event.target.value;
-  });
+  element.addEventListener('change',event=>{if(event.target.name==='need')syncBooking();});
+  if(bookingBox)wireBooking(bookingBox);
   syncBooking();
   element.onsubmit=async event=>{
    event.preventDefault();

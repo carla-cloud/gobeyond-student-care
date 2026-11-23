@@ -90,7 +90,7 @@ async function setupSchema(db) {
 let schemaReady;
 const ensureSchema = db => schemaReady ??= setupSchema(db).catch(error => { schemaReady = undefined; throw error; });
 const slotSql = 'SELECT s.*,c.name AS consultant_name,c.phone AS consultant_phone FROM slots s JOIN consultants c ON c.id=s.consultant_id';
-const calendarRowsSql = `SELECT s.id,s.starts_at,s.ends_at,s.status,s.feedback_id,s.booked_at,s.cancelled_at,
+const calendarRowsSql = `SELECT s.id,s.consultant_id,s.starts_at,s.ends_at,s.status,s.feedback_id,s.booked_at,s.cancelled_at,
   c.name AS consultant_name,c.phone AS consultant_phone,st.name AS student_name,f.note
   FROM slots s JOIN consultants c ON c.id=s.consultant_id LEFT JOIN students st ON st.id=s.student_id LEFT JOIN feedback f ON f.id=s.feedback_id
   WHERE s.starts_at>=? ORDER BY s.starts_at,c.name`;
@@ -157,8 +157,11 @@ async function api(request,env,ctx,url) {
     if (student.start_date>day || student.end_date<day) return fail('This check-in link is outside your program dates.',409);
     const existing=await first(db,"SELECT id FROM feedback WHERE student_id=? AND week=? AND kind='check-in'",student.id,week);
     if (path==='/api/student') return json({name:student.name,week,submitted:!!existing});
-    if (path==='/api/slots') return json({slots:await all(db,`SELECT s.id,s.starts_at,s.ends_at,c.name AS consultant_name
-      FROM slots s JOIN consultants c ON c.id=s.consultant_id WHERE s.status='open' AND s.starts_at>? ORDER BY s.starts_at,c.name LIMIT 60`,now())});
+    // Open future slots plus every consultant (so the student sees all of them listed for a day, even with no times).
+    if (path==='/api/slots') return json({
+      slots:await all(db,`SELECT s.id,s.consultant_id,s.starts_at,s.ends_at,c.name AS consultant_name
+        FROM slots s JOIN consultants c ON c.id=s.consultant_id WHERE s.status='open' AND s.starts_at>? ORDER BY s.starts_at,c.name LIMIT 500`,now()),
+      consultants:await all(db,'SELECT id,name FROM consultants ORDER BY rowid')});
     if (path==='/api/book') {
       const checkIn=await first(db,"SELECT id FROM feedback WHERE id=? AND student_id=? AND kind='check-in' AND need='urgent' AND week=?",text(input.feedback_id),student.id,week);
       if (!checkIn) return fail('Calls can only be booked from an urgent check-in this week.',403);
@@ -228,7 +231,7 @@ async function api(request,env,ctx,url) {
 
   if (path==='/api/data' && method==='GET') {
     const [students,feedback,slots,consultantRows]=await Promise.all([all(db,rosterSql),all(db,rowsSql),all(db,calendarRowsSql,new Date(Date.now()-2*86400000).toISOString()),
-      all(db,'SELECT id,name,phone FROM consultants ORDER BY name')]);
+      all(db,'SELECT id,name,phone FROM consultants ORDER BY rowid')]);
     const sheetUrl = typeof env.GOOGLE_SHEET_URL === 'string' &&
       /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[A-Za-z0-9_-]+\/edit$/.test(env.GOOGLE_SHEET_URL)
       ? env.GOOGLE_SHEET_URL : null;
