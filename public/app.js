@@ -233,7 +233,7 @@ const IT={
  'Send another message':'Invia un altro messaggio',
  // Consultant call booking (student) and Calendar (staff)
  'Calendar':'Calendario',
- 'Consultant calls booked by students who asked for urgent support.':'Chiamate con i consulenti prenotate dagli studenti che hanno chiesto supporto urgente.',
+ 'Consultant calls booked by students from their weekly check-in.':'Chiamate con i consulenti prenotate dagli studenti dal loro check-in settimanale.',
  'Times are in Italian time.':'Gli orari sono in ora italiana.',
  'Time':'Orario',
  'Consultant':'Consulente',
@@ -273,7 +273,7 @@ const IT={
  'Book call':'Prenota la chiamata',
  'Skip':'Salta',
  'Choose a time first.':'Scegli prima un orario.',
- 'Calls can only be booked from an urgent check-in this week.':'Le chiamate si possono prenotare solo da un check-in urgente di questa settimana.',
+ 'Calls can be booked from this week’s check-in. Send your check-in first.':'Le chiamate si prenotano dal check-in di questa settimana. Invia prima il tuo check-in.',
  'The appointment was not found or is already cancelled.':'L’appuntamento non è stato trovato o è già stato annullato.',
  // Consultant availability (staff)
  'Add availability':'Aggiungi disponibilità',
@@ -465,7 +465,7 @@ const IT={
  'Your phone or WhatsApp number':'Il tuo numero di telefono o WhatsApp',
  'The consultant will call you on this number.':'Il consulente ti chiamerà a questo numero.',
  'Enter a phone number so the consultant can call you.':'Inserisci un numero di telefono così il consulente può chiamarti.',
- 'You told us this week that it’s urgent. You can still book a call with a consultant.':'Questa settimana ci hai detto che è urgente. Puoi ancora prenotare una chiamata con un consulente.',
+ 'Would you like to talk to someone? You can book a call with a consultant about this week’s check-in.':'Vuoi parlare con qualcuno? Puoi prenotare una chiamata con un consulente sul check-in di questa settimana.',
  'This time is no longer available. Choose another time.':'Questo orario non è più disponibile. Scegli un altro orario.',
  'by {who}':'da {who}',
  'Inactive':'Non attivo',
@@ -859,7 +859,7 @@ function calendarView(){
   ?`<section class="card"><div class="card-head"><div><h2>${esc(person.name)} · ${callDayLabel(dayOf(calDay))}</h2><p>${phoneLink(person.phone)}</p></div></div>${table(['Time','Status','Student','Check-in note'],daySlots.filter(s=>consultantOf(s)===person.id).map(row),t('No times for {name} on this day.',{name:esc(person.name)}))}</section>`
   :`<section class="card"><p class="empty">${t('Choose a consultant to see their times.')}</p></section>`;
  const hasExamples=slots.some(s=>s.status==='open'&&exampleSlotId(s.id));
- return title('Calendar','Consultant calls booked by students who asked for urgent support.',
+ return title('Calendar','Consultant calls booked by students from their weekly check-in.',
    btn('Consultants','consultants','user')+(hasExamples?btn('Remove example times','remove-examples'):'')+btn('Recurring availability','recurring','repeat')+btn('Add availability','add-slots','plus',true))+
   `<div class="calendar-legend">${['open','booked','cancelled'].map(status=>`<span class="pill ${slotClass(status)}">${slotLabel(status)}: ${total(status)}</span>`).join('')}<span class="muted">${t('Times are in Italian time.')}</span><span class="calendar-status" id="page-status" role="status"></span></div>
   <section class="calendar-layout">
@@ -1306,7 +1306,7 @@ async function formPage(){
  }
  if(student.submitted)kind='message';
  let submissionId=crypto.randomUUID();
- // Optional consultant call booking, offered when the student answers "Yes, it's urgent".
+ // Optional consultant call booking, offered to every student once they answer the support question (any answer).
  // Order: pick a day on the calendar -> pick a consultant -> pick one of their times. The chosen slot travels in a hidden field.
  let slotsState='idle',slotList=[],slotPeople=[],chosenSlot='',pickDay='',pickConsultant='',viewMonth='';
  // The consultant calls the student, so booking asks for a phone (filled in if we already have it). laterBooking = a call booked later from this link.
@@ -1417,7 +1417,7 @@ async function formPage(){
    ${preview?`<p class="notice">${t('Sample form. Your response will appear in the sample workspace on this browser.')}</p>`:''}
    ${student.submitted?`<p class="notice">${t('Your check-in for this week is saved. You can still send a message.')}</p>`:''}
    ${laterBooking?bookingSummary(laterBooking.slot)
-    :message&&!preview&&student.urgent&&!student.urgent.booked?`<section class="later-booking"><p class="notice">${t('You told us this week that it’s urgent. You can still book a call with a consultant.')}</p><form id="later-book" novalidate><section class="booking" id="booking">${slotPicker()}</section><p class="error" role="alert"></p><div class="actions"><button type="submit" class="btn primary">${t('Book call')}</button></div></form></section>`:''}
+    :message&&!preview&&student.checkIn&&!student.checkIn.booked?`<section class="later-booking"><p class="notice">${t('Would you like to talk to someone? You can book a call with a consultant about this week’s check-in.')}</p><form id="later-book" novalidate><section class="booking" id="booking">${slotPicker()}</section><p class="error" role="alert"></p><div class="actions"><button type="submit" class="btn primary">${t('Book call')}</button></div></form></section>`:''}
    <div class="actions" style="margin-bottom:17px">${student.submitted?'':`<button class="btn" id="switch-kind">${t(message?'Back to weekly check-in':'Send a separate message')}</button>`}</div>
    <form id="checkin-form">
    ${message?'':`<fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:9px">${t('How are you feeling this week?')}</legend><div class="choices">${faces.slice(1).map((face,i)=>`<label><input type="radio" name="mood" value="${i+1}" required><span><b aria-hidden="true">${face}</b>${t(moods[i+1])}</span></label>`).join('')}</div></fieldset>
@@ -1441,8 +1441,8 @@ async function formPage(){
      if(!slotId)throw new Error('Choose a time first.');
      needsPhone();
      button.disabled=true;
-     const result=(await request('/api/book',{token,feedback_id:student.urgent.id,slot:slotId,phone:bookingPhone,language:lang})).booking;
-     if(result.status==='booked'){student.urgent.booked=true;laterBooking=result;form(Object.fromEntries(new FormData(element)));}
+     const result=(await request('/api/book',{token,feedback_id:student.checkIn.id,slot:slotId,phone:bookingPhone,language:lang})).booking;
+     if(result.status==='booked'){student.checkIn.booked=true;laterBooking=result;form(Object.fromEntries(new FormData(element)));}
      else{slotsState='idle';chosenSlot='';later.querySelector('#booking').innerHTML=slotPicker();throw new Error('This time is no longer available. Choose another time.');}
     }catch(error){showError(later,error);button.disabled=false;}
    };
@@ -1452,11 +1452,11 @@ async function formPage(){
   rerender=()=>form(Object.fromEntries(new FormData(element)));
   const toggle=document.querySelector('#switch-kind');
   if(toggle)toggle.onclick=()=>{kind=message?'check-in':'message';form();};
-  // Show the call booking only while "Yes, it's urgent" is selected.
+  // Show the optional call booking as soon as the support question is answered (any answer).
   const bookingBox=element.querySelector('#booking');
   const syncBooking=()=>{
    if(!bookingBox)return;
-   bookingBox.hidden=element.elements.need.value!=='urgent';
+   bookingBox.hidden=!element.elements.need.value;
    if(!bookingBox.hidden)bookingBox.innerHTML=slotPicker();
   };
   element.addEventListener('change',event=>{if(event.target.name==='need')syncBooking();});
@@ -1467,7 +1467,7 @@ async function formPage(){
    const button=element.querySelector('button[type=submit]');
    button.disabled=true;
    const input={...Object.fromEntries(new FormData(element)),kind,token,id:submissionId,language:lang};
-   if(message||input.need!=='urgent'||!input.slot){delete input.slot;delete input.phone;}
+   if(message||!input.slot){delete input.slot;delete input.phone;}
    try{
     if(message&&!input.note.trim())throw new Error('Enter a message before sending.');
     if(input.slot)needsPhone();
@@ -1481,7 +1481,11 @@ async function formPage(){
      stored.status=stored.priority==='routine'?'resolved':'open';
      mock.feedback.unshift(stored);
      saveDemo(mock);
-     if(input.slot)booking=demoBook(input.slot,record);
+     if(input.slot){
+      booking=demoBook(input.slot,record);
+      // Same rule as the server: a booked call makes a routine check-in an open follow-up.
+      if(booking.status==='booked'&&stored.priority==='routine'){const fresh=readDemo();Object.assign(fresh.feedback.find(r=>r.id===stored.id),{priority:'follow',status:'open'});saveDemo(fresh);}
+     }
     }else booking=(await request('/api/submit',input)).booking||null;
     if(booking?.status==='taken'){slotsState='idle';chosenSlot='';}
     student.submitted ||= !message;

@@ -37,7 +37,7 @@ const areasTableSql = `CREATE TABLE IF NOT EXISTS checkin_areas (
  studies TEXT NOT NULL, housing TEXT NOT NULL, social TEXT NOT NULL, health TEXT NOT NULL, money TEXT NOT NULL
 )`;
 // Consultant call calendar: same tables as drizzle/0005_consultant_calendar.sql.
-// A slot is 'open' (bookable), 'booked' (by a student from an urgent check-in) or 'cancelled' (by staff; never re-offered).
+// A slot is 'open' (bookable), 'booked' (by a student from their weekly check-in) or 'cancelled' (by staff; never re-offered).
 const consultants = [['maria','Maria','+39 320 123 4567'],['francesco','Francesco','+39 331 234 5678'],['giorgia','Giorgia','+39 342 345 6789']];
 const calendarSql = [
   'CREATE TABLE IF NOT EXISTS consultants (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL)',
@@ -150,10 +150,11 @@ const calendarRowsSql = `SELECT s.id,s.consultant_id,s.starts_at,s.ends_at,s.sta
   FROM slots s JOIN consultants c ON c.id=s.consultant_id LEFT JOIN students st ON st.id=s.student_id LEFT JOIN feedback f ON f.id=s.feedback_id
   WHERE s.starts_at>=? ORDER BY s.starts_at,c.name`;
 const bookingInfo = s => ({id:s.id,starts_at:s.starts_at,ends_at:s.ends_at,consultant_name:s.consultant_name,consultant_phone:s.consultant_phone});
-// Books a future open slot for one urgent check-in. The conditional UPDATE means only one student can win a slot;
-// the one_booking_per_checkin index means a check-in can hold at most one booked slot.
+// Books a future open slot for one weekly check-in (any support answer). The conditional UPDATE means only one
+// student can win a slot; the one_booking_per_checkin index means a check-in can hold at most one booked slot.
 // `fresh` = this call made the booking (so a confirmation email goes out once). The student's phone is kept
-// on the slot and on their record so the consultant can call them.
+// on the slot and on their record so the consultant can call them. A booked call always needs staff attention,
+// so a check-in that was routine ("No, all good") becomes an open follow-up.
 async function book(db,studentId,feedbackId,slotId,phone) {
   const current=await first(db,slotSql+" WHERE s.feedback_id=? AND s.status='booked'",feedbackId);
   if (current) return {status:'booked',slot:bookingInfo(current)};
@@ -164,7 +165,10 @@ async function book(db,studentId,feedbackId,slotId,phone) {
       studentId,feedbackId,now(),phone,slotId,now())).meta.changes;
   } catch {}
   const booked=await first(db,slotSql+" WHERE s.feedback_id=? AND s.status='booked'",feedbackId);
-  if (booked && changes) await run(db,'UPDATE students SET phone=? WHERE id=?',phone,studentId);
+  if (booked && changes) {
+    await run(db,'UPDATE students SET phone=? WHERE id=?',phone,studentId);
+    await run(db,"UPDATE feedback SET priority='follow',status='open' WHERE id=? AND priority='routine'",feedbackId);
+  }
   return booked ? {status:'booked',slot:bookingInfo(booked),fresh:!!changes,raw:booked} : {status:'taken'};
 }
 // Call booked / cancelled email for the student (consultant in cc), with a calendar invite in Italian time.
@@ -350,10 +354,10 @@ async function api(request,env,ctx,url) {
       student.language=language;
     }
     if (path==='/api/student') {
-      // An urgent check-in this week without a booked call lets the student book later from the same link.
-      const urgent=await first(db,`SELECT f.id,EXISTS(SELECT 1 FROM slots s WHERE s.feedback_id=f.id AND s.status='booked') AS booked
-        FROM feedback f WHERE f.student_id=? AND f.week=? AND f.kind='check-in' AND f.need='urgent' AND f.deleted_at IS NULL`,student.id,week);
-      return json({name:student.name,week,submitted:!!existing,phone:student.phone||'',urgent:urgent?{id:urgent.id,booked:!!urgent.booked}:null});
+      // This week's check-in without a booked call lets the student book one later from the same link.
+      const checkIn=await first(db,`SELECT f.id,EXISTS(SELECT 1 FROM slots s WHERE s.feedback_id=f.id AND s.status='booked') AS booked
+        FROM feedback f WHERE f.student_id=? AND f.week=? AND f.kind='check-in' AND f.deleted_at IS NULL`,student.id,week);
+      return json({name:student.name,week,submitted:!!existing,phone:student.phone||'',checkIn:checkIn?{id:checkIn.id,booked:!!checkIn.booked}:null});
     }
     // Open future slots of active consultants, plus every active consultant (all listed for a day, even with no times).
     if (path==='/api/slots') return json({
@@ -362,15 +366,15 @@ async function api(request,env,ctx,url) {
       consultants:await all(db,'SELECT id,name FROM consultants WHERE active=1 ORDER BY rowid')});
     const phone=text(input.phone);
     if (path==='/api/book') {
-      const checkIn=await first(db,"SELECT id FROM feedback WHERE id=? AND student_id=? AND kind='check-in' AND need='urgent' AND week=? AND deleted_at IS NULL",text(input.feedback_id),student.id,week);
-      if (!checkIn) return fail('Calls can only be booked from an urgent check-in this week.',403);
+      const checkIn=await first(db,"SELECT id FROM feedback WHERE id=? AND student_id=? AND kind='check-in' AND week=? AND deleted_at IS NULL",text(input.feedback_id),student.id,week);
+      if (!checkIn) return fail('Calls can be booked from this week’s check-in. Send your check-in first.',403);
       if (!validPhone(phone)) return fail('Enter a phone number so the consultant can call you.');
       const booking=await book(db,student.id,checkIn.id,text(input.slot),phone);
       const mailer=mailerFor(env);
       if (booking.fresh && mailer) ctx.waitUntil(deliver(db,mailer,callEvent('booked',booking.raw,student)).catch(()=>{}));
       return json({booking:{status:booking.status,slot:booking.slot}});
     }
-    if (input.kind==='check-in' && input.need==='urgent' && text(input.slot) && !validPhone(phone))
+    if (input.kind==='check-in' && text(input.slot) && !validPhone(phone))
       return fail('Enter a phone number so the consultant can call you.');
     const kind=input.kind, mood=Number(input.mood), need=input.need, topic=text(input.topic), note=text(input.note);
     const answers=areaKeys.map(key=>input[key]);
@@ -394,12 +398,13 @@ async function api(request,env,ctx,url) {
     const record=await first(db,feedbackWithStudent+' WHERE f.id=? AND f.student_id=? AND f.deleted_at IS NULL AND s.deleted_at IS NULL',submissionId,student.id);
     if (!record) return fail('A check-in for this week already exists. Reload to send a separate message.',409);
     if (sheet) ctx.waitUntil(deliver(db,sheet,feedbackEvent(record)).catch(()=>{}));
-    // Optional call booking: only from an urgent weekly check-in that picked a slot.
-    const booking = kind==='check-in' && need==='urgent' && saved.kind==='check-in' && text(input.slot)
+    // Optional call booking: from any weekly check-in that picked a slot, whatever the support answer.
+    const booking = kind==='check-in' && saved.kind==='check-in' && text(input.slot)
       ? await book(db,student.id,submissionId,text(input.slot),phone) : null;
     const mailer=mailerFor(env);
     if (booking?.fresh && mailer) ctx.waitUntil(deliver(db,mailer,callEvent('booked',booking.raw,student)).catch(()=>{}));
-    return json({saved:true,priority:record.priority,booking:booking&&{status:booking.status,slot:booking.slot}});
+    const finalPriority=booking?.fresh && record.priority==='routine' ? 'follow' : record.priority;
+    return json({saved:true,priority:finalPriority,booking:booking&&{status:booking.status,slot:booking.slot}});
   }
 
   // Final feedback form: the student's personal link on /final, open from 3 days before to 30 days after their end date.
