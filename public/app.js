@@ -1,7 +1,8 @@
 const app=document.querySelector('#app');
 const detail=document.querySelector('#detail');
 const langKey='gobeyond-lang';
-let lang=(()=>{try{return localStorage.getItem(langKey)==='it'?'it':'en';}catch{return 'en';}})();
+// A saved choice wins; otherwise student pages follow the browser language (Italian students see Italian), staff pages start in English.
+let lang=(()=>{try{const saved=localStorage.getItem(langKey);if(saved)return saved==='it'?'it':'en';}catch{}return /^\/(check-in|final)$/.test(location.pathname)&&/^it\b/i.test(navigator.language||'')?'it':'en';})();
 // Italian translations, keyed by the English text shown on screen.
 const IT={
  'Gobeyond Student Care':'Gobeyond Assistenza Studenti',
@@ -298,6 +299,218 @@ const IT={
  'Choose times in the future.':'Scegli orari futuri.',
  'Some of these times overlap with this consultant’s existing availability.':'Alcuni di questi orari si sovrappongono alla disponibilità già inserita per questo consulente.',
  'This time was not found or is no longer open.':'Questo orario non è stato trovato o non è più libero.',
+ // Final feedback (student form)
+ 'End of your journey':'Fine del tuo viaggio',
+ 'Your Go Beyond experience':'La tua esperienza Go Beyond',
+ 'Tell us how your program went.':'Raccontaci com’è andato il tuo programma.',
+ 'Your program has ended: tell us how it went. It takes less than 4 minutes.':'Il tuo programma è terminato: raccontaci com’è andata. Ci vogliono meno di 4 minuti.',
+ 'Sample form. Your answers will appear in the sample workspace on this browser.':'Modulo di esempio. Le tue risposte compariranno nell’area di esempio su questo browser.',
+ 'Step {n} of 3':'Passo {n} di 3',
+ 'Overall':'Nel complesso',
+ 'Your stay':'Il tuo soggiorno',
+ 'Your words':'Le tue parole',
+ 'Overall, how was your experience abroad?':'Nel complesso, com’è stata la tua esperienza all’estero?',
+ 'How likely are you to recommend Go Beyond to a friend?':'Quanto è probabile che consiglieresti Go Beyond a un amico?',
+ 'Not at all likely':'Per niente probabile',
+ 'Extremely likely':'Estremamente probabile',
+ 'Where did you live?':'Dove hai vissuto?',
+ 'Host family':'Famiglia ospitante',
+ 'Boarding house':'Boarding house',
+ 'Rate each part of your stay from 1 (very poor) to 5 (excellent).':'Valuta ogni aspetto del soggiorno da 1 (pessimo) a 5 (ottimo).',
+ 'Life with your host family':'Vita in famiglia',
+ 'Life in the boarding house':'Vita in boarding house',
+ 'Life with your host family / in the boarding house':'Vita in famiglia / in boarding house',
+ 'School life and the quality of teaching':'Vita a scuola e qualità della didattica',
+ 'Making friends with international and local students':'Amicizie con studenti internazionali e ragazzi del posto',
+ 'Support on site from your Local Coordinator and/or Tutor':'Assistenza in loco del Local Coordinator e/o del Tutor',
+ 'Support from the Go Beyond team in Italy, before and during your stay':'Supporto del team Go Beyond in Italia, prima e durante il soggiorno',
+ 'Travel and arrival organisation':'Organizzazione del viaggio e dell’arrivo',
+ 'Very poor':'Pessimo',
+ 'Poor':'Scarso',
+ 'Fair':'Sufficiente',
+ 'scale|Good':'Buono',
+ 'Excellent':'Ottimo',
+ '(optional)':'(facoltativo)',
+ 'Tell us what went wrong':'Raccontaci cosa è andato storto',
+ 'Comment (optional)':'Commento (facoltativo)',
+ 'Add a comment':'Aggiungi un commento',
+ 'What was the best part of your experience?':'Qual è stata la parte migliore della tua esperienza?',
+ 'What was the hardest part, or what should we improve?':'Qual è stata la parte più difficile, o cosa dovremmo migliorare?',
+ 'One piece of advice for a student leaving for the same destination':'Un consiglio per chi partirà per la stessa destinazione',
+ 'Can we share your comments with your first name and destination on our website and social media?':'Possiamo condividere i tuoi commenti, con nome e destinazione, sul nostro sito e sui social?',
+ 'Would you like to hear about future Go Beyond programs?':'Vuoi ricevere informazioni sui prossimi programmi Go Beyond?',
+ 'Yes':'Sì',
+ 'Back':'Indietro',
+ 'Next':'Avanti',
+ 'Send my feedback':'Invia il mio feedback',
+ 'Thank you!':'Grazie!',
+ 'You have already sent your final feedback.':'Hai già inviato il tuo feedback finale.',
+ 'Your final feedback has been saved.':'Il tuo feedback finale è stato salvato.',
+ 'Thank you for helping us make Go Beyond better for the students who come after you.':'Grazie per aiutarci a rendere Go Beyond migliore per gli studenti che partiranno dopo di te.',
+ 'Tell us what went wrong for each topic you rated 1 or 2.':'Raccontaci cosa è andato storto per ogni aspetto valutato 1 o 2.',
+ 'Only the Go Beyond team can read your answers. We use them to support you and to improve our programs.':'Solo il team Go Beyond può leggere le tue risposte. Le usiamo per supportarti e per migliorare i nostri programmi.',
+ // Final feedback (staff)
+ 'Final feedback':'Feedback finale',
+ 'final':'feedback finale',
+ 'Low scores in the final feedback':'Punteggi bassi nel feedback finale',
+ 'What students tell us when their program ends.':'Cosa ci raccontano gli studenti alla fine del programma.',
+ 'Preview final form':'Anteprima modulo finale',
+ 'All destinations':'Tutte le destinazioni',
+ 'All end months':'Tutti i mesi di fine',
+ 'Testimonials only':'Solo testimonianze',
+ 'Final feedback summary':'Riepilogo del feedback finale',
+ 'Invited':'Invitati',
+ 'Students sent the form':'Studenti a cui è stato inviato il modulo',
+ 'Responses received':'Risposte ricevute',
+ 'No invitations yet':'Ancora nessun invito',
+ 'Overall rating':'Valutazione complessiva',
+ 'Average out of 5':'Media su 5',
+ 'Recommendation score':'Indice di raccomandazione',
+ 'NPS: % 9–10 minus % 0–6':'NPS: % 9–10 meno % 0–6',
+ 'Testimonials':'Testimonianze',
+ 'Responses':'Risposte',
+ 'Only students who agreed to share their words.':'Solo gli studenti che hanno accettato di condividere le loro parole.',
+ 'Newest first':'Dalle più recenti',
+ 'Average by topic':'Media per argomento',
+ 'Out of 5. Below 3 is highlighted.':'Su 5. Sotto 3 è evidenziato.',
+ 'Low scores':'Punteggi bassi',
+ 'Promoter':'Promotore',
+ 'Passive':'Passivo',
+ 'Detractor':'Detrattore',
+ 'Advice':'Consiglio',
+ 'No testimonials with consent yet.':'Ancora nessuna testimonianza con consenso.',
+ 'Final feedback appears here when students finish their program and answer the form.':'Il feedback finale compare qui quando gli studenti concludono il programma e rispondono al modulo.',
+ 'Host family / boarding house':'Famiglia ospitante / boarding house',
+ 'School and teaching':'Scuola e didattica',
+ 'Friends':'Amicizie',
+ 'Local Coordinator / Tutor':'Local Coordinator / Tutor',
+ 'Go Beyond team':'Team Go Beyond',
+ 'Travel and arrival':'Viaggio e arrivo',
+ 'Sent on {date}':'Inviato il {date}',
+ 'Sent on':'Inviato il',
+ 'Where they lived':'Dove ha vissuto',
+ 'Best part':'Parte migliore',
+ 'Hardest part / to improve':'Parte più difficile / da migliorare',
+ 'Advice for future students':'Consiglio per i futuri studenti',
+ 'Share comments publicly':'Condividere i commenti pubblicamente',
+ 'Future programs':'Programmi futuri',
+ 'Open the follow-up':'Apri il follow-up',
+ 'Open the final feedback':'Apri il feedback finale',
+ 'Recommend (0–10)':'Consiglierebbe (0–10)',
+ 'comment':'commento',
+ 'Final feedback form':'Modulo di feedback finale',
+ 'Received on {date}':'Ricevuto il {date}',
+ 'Sent, waiting for an answer':'Inviato, in attesa di risposta',
+ 'Not sent yet':'Non ancora inviato',
+ 'The form opens 3 days before the end of the program and closes 30 days after it. The invitation is sent automatically on the end date, with reminders after 4 and 10 days.':'Il modulo si apre 3 giorni prima della fine del programma e si chiude 30 giorni dopo. L’invito parte automaticamente il giorno di fine, con promemoria dopo 4 e 10 giorni.',
+ 'Final feedback link':'Link del feedback finale',
+ 'Send the form by email now':'Invia ora il modulo via email',
+ 'Copy link':'Copia link',
+ 'Link copied.':'Link copiato.',
+ 'Sent.':'Inviato.',
+ 'The final feedback form is sent automatically on each student’s end date, with reminders after 4 and 10 days. It stays open for 30 days.':'Il modulo di feedback finale parte automaticamente il giorno di fine di ogni studente, con promemoria dopo 4 e 10 giorni. Resta aperto per 30 giorni.',
+ // Student record, student page, trends, activity, privacy
+ 'View {name}':'Apri {name}',
+ 'Phone or WhatsApp (optional)':'Telefono o WhatsApp (facoltativo)',
+ 'Phone or WhatsApp':'Telefono o WhatsApp',
+ 'Email language':'Lingua delle email',
+ 'Automatic (Italian until the student chooses)':'Automatica (italiano finché lo studente non sceglie)',
+ 'Automatic':'Automatica',
+ 'Parent email for emergencies (optional)':'Email di un genitore per le emergenze (facoltativa)',
+ 'Parent email (emergencies)':'Email del genitore (emergenze)',
+ 'Never used for check-ins or the final feedback form.':'Non viene mai usata per i check-in o per il feedback finale.',
+ 'Mood week by week':'Umore settimana per settimana',
+ 'How things went, week by week':'Com’è andata, settimana per settimana',
+ 'No weekly check-ins yet.':'Ancora nessun check-in settimanale.',
+ 'No responses yet.':'Ancora nessuna risposta.',
+ 'Calls':'Chiamate',
+ 'No calls booked.':'Nessuna chiamata prenotata.',
+ 'Recommend':'Consiglierebbe',
+ 'View answers':'Vedi le risposte',
+ 'Not received yet.':'Non ancora ricevuto.',
+ 'Average mood':'Umore medio',
+ '“Difficult” answers':'Risposte “Difficile”',
+ 'Trends over the last 8 weeks':'Andamento delle ultime 8 settimane',
+ 'Average mood and “Difficult” answers per area, from weekly check-ins.':'Umore medio e risposte “Difficile” per area, dai check-in settimanali.',
+ 'Where students struggle':'Dove gli studenti hanno difficoltà',
+ 'Recent activity':'Attività recenti',
+ 'Who did what in the workspace.':'Chi ha fatto cosa nell’area di lavoro.',
+ 'When':'Quando',
+ 'Who':'Chi',
+ 'What':'Cosa',
+ 'Details':'Dettagli',
+ 'No activity yet.':'Ancora nessuna attività.',
+ 'student added':'studente aggiunto',
+ 'student edited':'studente modificato',
+ 'student deleted':'studente eliminato',
+ 'student restored':'studente ripristinato',
+ 'response deleted':'risposta eliminata',
+ 'response restored':'risposta ripristinata',
+ 'response edited':'risposta modificata',
+ 'status changed':'stato modificato',
+ 'call cancelled':'chiamata annullata',
+ 'consultant saved':'consulente salvato',
+ 'availability added':'disponibilità aggiunta',
+ 'recurring availability added':'disponibilità ricorrente aggiunta',
+ 'time removed':'orario rimosso',
+ 'example times removed':'orari di esempio rimossi',
+ 'final feedback form sent':'modulo di feedback finale inviato',
+ 'Privacy':'Privacy',
+ 'Personal details and written answers are removed {n} months after a program ends. Ratings are kept for statistics.':'Dati personali e risposte scritte vengono rimossi {n} mesi dopo la fine del programma. Le valutazioni restano per le statistiche.',
+ 'No automatic removal is set. Set RETENTION_MONTHS on the hosting platform to remove personal details and written answers that many months after a program ends.':'Nessuna rimozione automatica impostata. Imposta RETENTION_MONTHS sulla piattaforma di hosting per rimuovere dati personali e risposte scritte quel numero di mesi dopo la fine del programma.',
+ 'Copied':'Copiato',
+ 'Copy':'Copia',
+ 'Copy this text':'Copia questo testo',
+ // Booking: phone, booking later, calendar extras, consultants, recurring availability
+ 'Your phone or WhatsApp number':'Il tuo numero di telefono o WhatsApp',
+ 'The consultant will call you on this number.':'Il consulente ti chiamerà a questo numero.',
+ 'Enter a phone number so the consultant can call you.':'Inserisci un numero di telefono così il consulente può chiamarti.',
+ 'You told us this week that it’s urgent. You can still book a call with a consultant.':'Questa settimana ci hai detto che è urgente. Puoi ancora prenotare una chiamata con un consulente.',
+ 'This time is no longer available. Choose another time.':'Questo orario non è più disponibile. Scegli un altro orario.',
+ 'by {who}':'da {who}',
+ 'Inactive':'Non attivo',
+ 'Active':'Attivo',
+ 'Consultants':'Consulenti',
+ 'Name':'Nome',
+ 'Phone':'Telefono',
+ 'Email (gets a copy of booking emails)':'Email (riceve una copia delle email di prenotazione)',
+ 'Active: students can book this consultant':'Attivo: gli studenti possono prenotare questo consulente',
+ 'Add a consultant':'Aggiungi un consulente',
+ 'Add consultant':'Aggiungi consulente',
+ 'Add a new consultant instead':'Aggiungi invece un nuovo consulente',
+ 'Recurring availability':'Disponibilità ricorrente',
+ 'All active consultants':'Tutti i consulenti attivi',
+ 'Days':'Giorni',
+ 'Time blocks (Italian time)':'Fasce orarie (ora italiana)',
+ 'Morning from':'Mattina dalle',
+ 'Afternoon from':'Pomeriggio dalle',
+ 'to':'alle',
+ 'Leave a block empty to skip it.':'Lascia vuota una fascia per saltarla.',
+ 'Starting':'A partire da',
+ 'Number of weeks':'Numero di settimane',
+ 'About {n} times in total ({per} per consultant per day). Times in the past or already taken are skipped.':'Circa {n} orari in totale ({per} per consulente al giorno). Gli orari passati o già occupati vengono saltati.',
+ 'Add these times':'Aggiungi questi orari',
+ 'Times added: {count}. Skipped: {skipped}.':'Orari aggiunti: {count}. Saltati: {skipped}.',
+ 'Remove example times':'Rimuovi orari di esempio',
+ 'Remove example times?':'Rimuovere gli orari di esempio?',
+ '{n} open example times were created when the app first started.':'Orari di esempio liberi creati al primo avvio dell’app: {n}.',
+ 'Booked and cancelled calls stay. Times you added yourself are not touched.':'Le chiamate prenotate e annullate restano. Gli orari aggiunti da voi non vengono toccati.',
+ 'Keep them':'Mantienili',
+ // Messages returned by the server (new)
+ 'Ask your Gobeyond coordinator for your personal feedback link.':'Chiedi al tuo coordinatore Gobeyond il tuo link personale per il feedback.',
+ 'The final feedback form is open from 3 days before to 30 days after the end of your program.':'Il modulo di feedback finale è aperto da 3 giorni prima a 30 giorni dopo la fine del tuo programma.',
+ 'You have already sent your final feedback. Thank you!':'Hai già inviato il tuo feedback finale. Grazie!',
+ 'The final feedback form opens 3 days before the end of the program.':'Il modulo di feedback finale si apre 3 giorni prima della fine del programma.',
+ 'The final feedback form closed 30 days after the end of the program.':'Il modulo di feedback finale si è chiuso 30 giorni dopo la fine del programma.',
+ 'This student has already sent their final feedback.':'Questo studente ha già inviato il feedback finale.',
+ 'Connect a reminder webhook to send emails.':'Collega un webhook dei promemoria per inviare email.',
+ 'The email could not be sent. Try again.':'Non è stato possibile inviare l’email. Riprova.',
+ 'Check the phone number.':'Controlla il numero di telefono.',
+ 'Check the parent email address.':'Controlla l’email del genitore.',
+ 'Check the consultant’s name, phone and email.':'Controlla nome, telefono ed email del consulente.',
+ 'The consultant was not found.':'Consulente non trovato.',
+ 'Choose consultants, days, time blocks, a start date and a number of weeks.':'Scegli consulenti, giorni, fasce orarie, una data di inizio e il numero di settimane.',
+ 'That would add more than 1,500 times. Choose fewer weeks or time blocks.':'Verrebbero aggiunti più di 1.500 orari. Scegli meno settimane o fasce orarie.',
  // Messages returned by the server
  'Unable to reach the CRM.':'Impossibile raggiungere il CRM.',
  'Something went wrong.':'Si è verificato un errore.',
@@ -349,7 +562,10 @@ const paths={
  download:'M12 3v12 M7 10l5 5 5-5 M4 16v5h16v-5',
  globe:'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0 M2 12h20 M12 2c5 5 5 15 0 20-5-5-5-15 0-20',
  plane:'M22 2 9 15 M22 2l-6 20-5-9-9-5 20-6',
- plus:'M12 5v14 M5 12h14'
+ plus:'M12 5v14 M5 12h14',
+ final:'M12 3l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6-4.4-4.2 6-.8z',
+ user:'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8',
+ repeat:'M17 2l4 4-4 4 M3 11V9a3 3 0 0 1 3-3h15 M7 22l-4-4 4-4 M21 13v2a3 3 0 0 1-3 3H3'
 };
 const icon=(name,size=18)=>`<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name]}"/></svg>`;
 const brand=`<a href="/" class="brand"><span class="logo">${icon('plane',21)}</span><span>gobeyond<small>International Education</small></span></a>`;
@@ -487,14 +703,50 @@ const exampleData=()=>{
  const slots=exampleSlots();
  const urgent=feedback.find(r=>r.need==='urgent');
  const assign=(slot,status)=>Object.assign(slot,{status,student_name:urgent.name,feedback_id:urgent.id,note:urgent.note});
- assign(slots.find(s=>s.id.startsWith('maria-')&&s.id.endsWith('-1400')),'booked');
- assign(slots.find(s=>s.id.startsWith('giorgia-')),'cancelled');
+ assign(slots.find(s=>s.id.startsWith('maria-')&&s.id.endsWith('-1400')),'booked').student_phone='+44 7700 900456';
+ Object.assign(assign(slots.find(s=>s.id.startsWith('giorgia-')),'cancelled'),{cancelled_by:'carla@example.com'});
+ // Earlier weeks, so the Overview trends and the student pages have a history (all resolved).
+ for(let back=1;back<=5;back++){
+  const week=new Date(Date.parse(currentWeek+'T12:00:00Z')-back*7*86400000).toISOString().slice(0,10);
+  examples.slice(0,6).forEach(([name,destination,mood,,answers],i)=>{
+   const record={id:`demo-${i}-w${back}`,student_id:'sample-'+i,name,destination,kind:'check-in',week,
+    mood:Math.max(1,Math.min(5,mood+((i+back)%3===0?1:(i+back)%3===1?0:-1)+(back>3&&i===2?2:0))),need:'none',topic:'',note:'',
+    created_at:new Date(Date.parse(week+'T16:00:00Z')+i*3600000).toISOString()};
+   answers.split(',').forEach((value,j)=>{record[areas[j][0]]=back>2&&value==='difficult'?'ok':value;});
+   record.priority=priorityFor(record);record.status='resolved';
+   feedback.push(record);
+  });
+ }
+ // Students who already finished, with their final feedback (one with a low score and its follow-up).
+ const finished=[['Chiara Esposito','London, UK',-6],['Marco Greco','Cork, Ireland',-12],['Sara Bruno','Calgary, Canada',-20],['Davide Galli','Melbourne, Australia',-3]]
+  .map(([name,destination,end],i)=>({id:'finished-'+i,name,destination,email:'finished'+i+'@example.com',start_date:dateAfter(end-180),end_date:dateAfter(end),language:i===1?'en':'it'}));
+ const blankFinal={travel:null,best:'',improve:'',advice:'',housing_comment:'',school_comment:'',social_comment:'',local_support_comment:'',team_support_comment:'',followup_id:null,language:'it',future_contact:null};
+ const finalRow=(i,values)=>({...blankFinal,id:'final-'+i,student_id:finished[i].id,name:finished[i].name,destination:finished[i].destination,end_date:finished[i].end_date,
+  submitted_at:new Date(Date.parse(finished[i].end_date+'T15:00:00Z')+2*86400000).toISOString(),...values});
+ const finalFeedback=[
+  finalRow(0,{overall:5,recommend:10,housing_type:'family',housing:5,school:4,social:5,local_support:4,team_support:5,travel:4,
+   best:'My host family treated me like a daughter and I made friends from five countries.',advice:'Say yes to every invitation in the first weeks!',share_consent:1,future_contact:1}),
+  finalRow(1,{overall:4,recommend:8,housing_type:'boarding',housing:4,school:4,social:3,social_comment:'It took me a while to make local friends.',local_support:5,team_support:4,travel:3,
+   improve:'More activities with local students in the first month.',share_consent:0,future_contact:1,language:'en'}),
+  finalRow(2,{overall:3,recommend:6,housing_type:'family',housing:2,housing_comment:'My host family was often away and I ate alone most evenings.',school:4,social:4,local_support:3,team_support:4,travel:4,
+   best:'The school and my classmates.',improve:'Check on host families more often during the stay.',share_consent:1,future_contact:0,followup_id:'demo-final-follow'})];
+ feedback.push({id:'demo-final-follow',student_id:'finished-2',name:'Sara Bruno',destination:'Calgary, Canada',kind:'final',week:currentWeek,mood:null,need:'none',topic:'',
+  note:'Host family / boarding house 2/5: My host family was often away and I ate alone most evenings.',priority:'follow',status:'open',created_at:new Date(Date.now()-3*3600000).toISOString()});
+ feedback.sort((a,b)=>b.created_at.localeCompare(a.created_at));
+ const ago=hours=>new Date(Date.now()-hours*3600000).toISOString();
  return {
-  students:examples.map(([name,destination],i)=>({id:'sample-'+i,name,destination,email:'student'+i+'@example.com',start_date:dateAfter(-60),end_date:dateAfter(90)})),
-  feedback,slots,day,week:currentWeek,integrations:{sheet:false,reminder:false}
+  students:[...examples.map(([name,destination],i)=>({id:'sample-'+i,name,destination,email:'student'+i+'@example.com',start_date:dateAfter(-60),end_date:dateAfter(90),
+   phone:i===2?'+44 7700 900456':'',parent_email:i===2?'parent.romano@example.com':'',language:'it'})),...finished],
+  feedback,slots,finalFeedback,finalInvited:finished.map(s=>s.id),
+  consultants:consultantList.map(([id,name,phone])=>({id,name,phone,email:id+'@example.com',active:1})),
+  activity:[
+   {at:ago(2),actor:'carla@example.com',action:'call cancelled',object_type:'slot',details:'Giorgia · Giulia Romano'},
+   {at:ago(26),actor:'carla@example.com',action:'recurring availability added',object_type:'slot',details:'maria · 09:00-12:30, 14:00-18:00 · 4 weeks'},
+   {at:ago(50),actor:'staff@example.com',action:'student added',object_type:'student',details:'Beatrice Gallo'}],
+  day,week:currentWeek,integrations:{sheet:false,reminder:false}
  };
 };
-const demoKey='gobeyond-demo-v4';
+const demoKey='gobeyond-demo-v5';
 function readDemo(){
  try {const data=JSON.parse(localStorage.getItem(demoKey));if(data?.week===currentWeek) return data;}catch{}
  return exampleData();
@@ -515,14 +767,17 @@ function pill(r){
  return `<span class="pill ${r.status==='resolved'?'resolved':r.priority}">${t(label)}</span>`;
 }
 function studentLink(s){return location.origin+'/check-in#'+s.token;}
-const views=[['overview','Overview'],['feedback','Feedback'],['students','Students'],['support','Support queue'],['calendar','Calendar'],['sheet','Spreadsheet'],['settings','Settings']];
+const views=[['overview','Overview'],['feedback','Feedback'],['students','Students'],['support','Support queue'],['calendar','Calendar'],['final','Final feedback'],['sheet','Spreadsheet'],['settings','Settings']];
+// Response types: weekly check-in, separate message, or the follow-up opened by low scores in the final feedback.
+const kindLabel=r=>t(r.kind==='message'?'Message':r.kind==='final'?'Final feedback':'Check-in');
 
 let data,view='overview',demo=false,search='',filter='all';
 const active=()=>data.students.filter(s=>s.start_date<=data.day&&s.end_date>=data.day);
 const current=()=>data.feedback.filter(r=>r.week===data.week&&r.kind==='check-in');
 const queue=()=>data.feedback.filter(r=>r.priority!=='routine'&&r.status!=='resolved').sort((a,b)=>Number(b.priority==='urgent')-Number(a.priority==='urgent')||Number(b.need==='week')-Number(a.need==='week')||b.created_at.localeCompare(a.created_at));
 // Short reason a response is in the support queue, e.g. "Contact this week · Difficult: Money".
-const queueReason=r=>[r.need==='week'?t('Contact this week'):'',areaSummary(r),r.topic?t(r.topic):''].filter(Boolean).join(' · ')||r.note||t('Requested support');
+const queueReason=r=>r.kind==='final'?t('Low scores in the final feedback')
+ :[r.need==='week'?t('Contact this week'):'',areaSummary(r),r.topic?t(r.topic):''].filter(Boolean).join(' · ')||r.note||t('Requested support');
 const waiting=()=>active().filter(s=>!current().some(r=>r.student_id===s.id));
 const person=r=>`<div class="person">${avatar(r.name)}<div><b>${esc(r.name)}</b><small>${esc(r.destination)}</small></div></div>`;
 const rowButton=r=>`<button class="row-link" data-record="${esc(r.id)}">${t('View')}</button>`;
@@ -540,7 +795,7 @@ function feedbackTable(rows,full=false,manage=false){
  if(!showActions)columns.push('');
  return table(columns,rows.map(r=>{
   const actions=showActions?`<div class="actions record-actions">${rowButton(r)}${removalButton('delete','feedback',r)}</div>`:'';
-  return `<tr><td>${person(r)}${actions}</td>${full?`<td>${dateLabel(r.week)}</td><td>${t(r.kind==='message'?'Message':'Check-in')}</td>`:''}<td>${moodLabel(r)}</td>${full?`<td>${esc(r.topic?t(r.topic):areaSummary(r))||'—'}</td>`:''}<td>${pill(r)}</td>${showActions?'':`<td>${rowButton(r)}</td>`}</tr>`;
+  return `<tr><td>${person(r)}${actions}</td>${full?`<td>${dateLabel(r.week)}</td><td>${kindLabel(r)}</td>`:''}<td>${moodLabel(r)}</td>${full?`<td>${esc(r.topic?t(r.topic):areaSummary(r))||'—'}</td>`:''}<td>${pill(r)}</td>${showActions?'':`<td>${rowButton(r)}</td>`}</tr>`;
  }),'Feedback appears here as students submit check-ins and messages.');
 }
 function removalButton(action,type,record,label=t(capital(action)),style='row-link'){
@@ -554,7 +809,7 @@ function recentlyDeleted(type,expanded){
  const columns=students?['Student','Email','']:['Student','Week of','Type','Topic',''];
  const rows=records.map(record=>`<tr><td>${person(record)}</td>${students
   ?`<td>${esc(record.email)}</td>`
-  :`<td>${dateLabel(record.week)}</td><td>${t(record.kind==='message'?'Message':'Check-in')}</td><td>${esc(record.topic?t(record.topic):areaSummary(record))||'—'}</td>`}
+  :`<td>${dateLabel(record.week)}</td><td>${kindLabel(record)}</td><td>${esc(record.topic?t(record.topic):areaSummary(record))||'—'}</td>`}
   <td>${removalButton('restore',type,record)}</td></tr>`);
  return `<details class="card" style="margin-top:16px" ${expanded?'open':''}><summary class="formbody">${t('Recently deleted')}${records.length?` (${records.length})`:''}</summary>
  ${table(columns,rows,students?'No deleted students.':'No deleted responses.')}</details>`;
@@ -577,7 +832,7 @@ function overview(){
  <section class="grid">
  <div class="card"><div class="card-head"><div><h2>${t('Recent feedback')}</h2><p>${t('Latest check-ins and messages')}</p></div>${btn('View all','feedback')}</div>${feedbackTable(data.feedback.slice(0,5))}</div>
  <div class="card"><div class="card-head"><div><h2>${t('Support queue')}</h2><p>${t('Students who may need help')}</p></div></div><div class="queue">${open.length?open.slice(0,5).map(r=>`<button class="queue-item" data-record="${esc(r.id)}">${avatar(r.name)}<span class="copy"><b>${esc(r.name)}</b><small>${esc(queueReason(r))}</small></span>${pill(r)}</button>`).join(''):`<p class="empty">${t('No open follow-ups.')}</p>`}</div></div>
- </section>`;
+ </section>${trendsCard()}`;
 }
 // Staff calendar: pick a day on the month grid, then a consultant, then see that consultant's slots for the day.
 let calDay='',calConsultant='',calMonth='';
@@ -594,16 +849,18 @@ function calendarView(){
  const consultantButtons=people.map(c=>{
   const mine=daySlots.filter(s=>consultantOf(s)===c.id);
   const count=status=>mine.filter(s=>s.status===status).length;
-  return `<button type="button" class="consultant-btn${calConsultant===c.id?' selected':''}" data-cal-consultant="${esc(c.id)}" aria-pressed="${calConsultant===c.id}"><b>${esc(c.name)}</b><small>${esc(c.phone)}</small><small>${mine.length?`${slotLabel('open')}: ${count('open')} · ${slotLabel('booked')}: ${count('booked')}${count('cancelled')?` · ${slotLabel('cancelled')}: ${count('cancelled')}`:''}`:t('No times')}</small></button>`;
+  return `<button type="button" class="consultant-btn${calConsultant===c.id?' selected':''}${isActive(c)?'':' inactive'}" data-cal-consultant="${esc(c.id)}" aria-pressed="${calConsultant===c.id}"><b>${esc(c.name)}${isActive(c)?'':` <span class="pill cancelled">${t('Inactive')}</span>`}</b><small>${esc(c.phone)}</small><small>${mine.length?`${slotLabel('open')}: ${count('open')} · ${slotLabel('booked')}: ${count('booked')}${count('cancelled')?` · ${slotLabel('cancelled')}: ${count('cancelled')}`:''}`:t('No times')}</small></button>`;
  }).join('');
  const person=people.find(c=>c.id===calConsultant);
  const action=s=>s.status==='booked'?`<span class="cell-sub"><button class="row-link danger" data-cancel-slot="${esc(s.id)}">${t('Cancel')}</button></span>`
   :s.status==='open'?`<span class="cell-sub"><button class="row-link muted-link" data-remove-slot="${esc(s.id)}">${t('Remove')}</button></span>`:'';
- const row=s=>`<tr class="slot-${s.status}"><td><b>${callTime(s.starts_at)}–${callTime(s.ends_at)}</b></td><td><span class="pill ${slotClass(s.status)}">${slotLabel(s.status)}</span>${action(s)}</td><td class="student-cell">${s.student_name?esc(s.student_name):'—'}</td><td class="note-cell">${s.status==='open'?'—':esc(s.note)||t('No written comment.')}</td></tr>`;
+ const row=s=>`<tr class="slot-${s.status}"><td><b>${callTime(s.starts_at)}–${callTime(s.ends_at)}</b></td><td><span class="pill ${slotClass(s.status)}">${slotLabel(s.status)}</span>${action(s)}${s.status==='cancelled'&&s.cancelled_by?`<span class="cell-sub muted">${t('by {who}',{who:esc(s.cancelled_by)})}</span>`:''}</td><td class="student-cell">${s.student_name?`<span class="student-name">${esc(s.student_name)}</span>${s.student_phone?`<span class="cell-sub">${phoneLink(s.student_phone)}</span>`:''}`:'—'}</td><td class="note-cell">${s.status==='open'?'—':esc(s.note)||t('No written comment.')}</td></tr>`;
  const detailCard=person
   ?`<section class="card"><div class="card-head"><div><h2>${esc(person.name)} · ${callDayLabel(dayOf(calDay))}</h2><p>${phoneLink(person.phone)}</p></div></div>${table(['Time','Status','Student','Check-in note'],daySlots.filter(s=>consultantOf(s)===person.id).map(row),t('No times for {name} on this day.',{name:esc(person.name)}))}</section>`
   :`<section class="card"><p class="empty">${t('Choose a consultant to see their times.')}</p></section>`;
- return title('Calendar','Consultant calls booked by students who asked for urgent support.',btn('Add availability','add-slots','plus',true))+
+ const hasExamples=slots.some(s=>s.status==='open'&&exampleSlotId(s.id));
+ return title('Calendar','Consultant calls booked by students who asked for urgent support.',
+   btn('Consultants','consultants','user')+(hasExamples?btn('Remove example times','remove-examples'):'')+btn('Recurring availability','recurring','repeat')+btn('Add availability','add-slots','plus',true))+
   `<div class="calendar-legend">${['open','booked','cancelled'].map(status=>`<span class="pill ${slotClass(status)}">${slotLabel(status)}: ${total(status)}</span>`).join('')}<span class="muted">${t('Times are in Italian time.')}</span><span class="calendar-status" id="page-status" role="status"></span></div>
   <section class="calendar-layout">
    <div class="card cal-card">${monthGrid({month:calMonth,selected:calDay,counts})}<p class="cal-key"><span><i class="dot open"></i>${t('Available times')}</span><span><i class="dot booked"></i>${t('Booked calls')}</span></p></div>
@@ -654,9 +911,11 @@ function rangeTimes(from,to,minutes){
  for(let m=toMinutes(from);m+minutes<=toMinutes(to);m+=minutes)times.push(String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'));
  return times;
 }
-const consultantsOf=()=>data.consultants||consultantList.map(([id,name,phone])=>({id,name,phone}));
+const consultantsOf=()=>data.consultants||consultantList.map(([id,name,phone])=>({id,name,phone,active:1}));
+const isActive=c=>c.active!==0&&c.active!==false;
+const exampleSlotId=slotId=>/^(maria|francesco|giorgia)-\d{4}-\d\d-\d\d-\d{4}$/.test(slotId);
 function availabilityDialog(){
- const people=consultantsOf();
+ const people=consultantsOf().filter(isActive);
  openDialog(t('Add consultant availability'),`<form>
   <label class="field">${t('Consultant')}<select name="consultant_id" required>${people.map(c=>`<option value="${esc(c.id)}" ${c.id===calConsultant?'selected':''}>${esc(c.name)} · ${esc(c.phone)}</option>`).join('')}</select></label>
   <label class="field">${t('Date')}<input name="date" type="date" required min="${callDay(new Date().toISOString())}" value="${calDay&&calDay>=callDay(new Date().toISOString())?calDay:dateAfter(1)}"></label>
@@ -704,11 +963,12 @@ function availabilityDialog(){
 function dataView(expandDeleted=false){
  if(view==='overview') return overview();
  if(view==='calendar') return calendarView();
+ if(view==='final') return finalView();
  if(view==='students') return title('Students','Manage program dates and personal check-in links.',btn('Add student','add','plus',true))+
   `<section class="card"><div class="card-head"><h2>${t('Student directory')}</h2></div>${table(['Student','Email','Program dates','This week',''],data.students.map(s=>{
    const received=current().some(r=>r.student_id===s.id);
    const state=s.start_date>data.day?'Upcoming':s.end_date<data.day?'Completed':received?'Received':'Awaiting';
-   const actions=`<div class="actions record-actions"><button class="row-link" data-edit-student="${esc(s.id)}" aria-label="${t('Edit {name}',{name:esc(s.name)})}">${t('Edit')}</button>${demo?'':removalButton('delete','students',s)}</div>`;
+   const actions=`<div class="actions record-actions"><button class="row-link" data-student-page="${esc(s.id)}" aria-label="${t('View {name}',{name:esc(s.name)})}">${t('View')}</button><button class="row-link" data-edit-student="${esc(s.id)}" aria-label="${t('Edit {name}',{name:esc(s.name)})}">${t('Edit')}</button><button class="row-link" data-final-student="${esc(s.id)}">${t('Final feedback')}</button>${demo?'':removalButton('delete','students',s)}</div>`;
    return `<tr><td>${person(s)}${actions}</td><td>${esc(s.email)}</td><td>${dateLabel(s.start_date)} – ${dateLabel(s.end_date)}</td><td><span class="pill ${received?'resolved':''}">${t(state)}</span></td><td>${s.token?`<button class="row-link" data-copy="${esc(s.id)}">${t('Copy check-in link')}</button>`:t('Sample student')}</td></tr>`;
   }),'Add a student to begin tracking their weekly check-ins.')}</section><p class="footnote" id="page-status" role="status"></p>`+
   recentlyDeleted('students',expandDeleted);
@@ -729,7 +989,13 @@ function dataView(expandDeleted=false){
      <p class="sub">${t('Each check-in or message appears immediately in the CRM spreadsheet.')}</p>
      <div class="actions" style="margin:14px 0">${sheetAction}</div>
      ${sheet||reminder?`${btn('Run connected jobs','jobs','clock',true)}<p class="footnote" id="page-status" role="status"></p>`:''}
-   </section>`;
+     <br><h2>${t('Final feedback')}</h2>
+     <p class="sub">${t('The final feedback form is sent automatically on each student’s end date, with reminders after 4 and 10 days. It stays open for 30 days.')}</p>
+     <br><h2>${t('Privacy')}</h2>
+     <p class="sub">${data.integrations.retentionMonths
+      ?t('Personal details and written answers are removed {n} months after a program ends. Ratings are kept for statistics.',{n:data.integrations.retentionMonths})
+      :t('No automatic removal is set. Set RETENTION_MONTHS on the hosting platform to remove personal details and written answers that many months after a program ends.')}</p>
+   </section>${activityCard()}`;
  }
  const sheet=view==='sheet';
  const support=view==='support';
@@ -763,23 +1029,34 @@ function render(expandDeleted=false){
   select.onchange=()=>{filter=select.value;filterRows();};
   filterRows();
  }
+ // Filters on the Overview trends and the Final feedback tab.
+ const bind=(selector,apply)=>{const el=document.querySelector(selector);if(el)el.onchange=()=>{apply(el);render();document.querySelector(selector)?.focus();};};
+ bind('#trend-dest',el=>{trendDest=el.value;});
+ bind('#final-dest',el=>{finalDest=el.value;});
+ bind('#final-month',el=>{finalMonth=el.value;});
+ bind('#final-quotes',el=>{finalQuotes=el.checked;});
 }
-function openDialog(title,body){
+function openDialog(title,body,wide=false){
+ detail.classList.toggle('wide',wide);
  detail.innerHTML=`<div class="dialog-head"><h2>${title}</h2><button data-close title="${t('Close')}" aria-label="${t('Close')}">✕</button></div>${body}`;
  detail.querySelector('[data-close]').onclick=()=>detail.close();
  if(!detail.open)detail.showModal();
 }
 function recordDialog(record){
  const areaRows=areas.filter(([key])=>record[key]).map(([key,label])=>`<li><span>${t(label)}</span><span class="pill ${ratingClass(record[key])}">${esc(ratingLabel(record[key]))}</span></li>`).join('');
- openDialog(esc(record.name),`<p class="sub">${esc(record.destination)} · ${t('Week of {date}',{date:dateLabel(record.week)})} · ${t(record.kind==='message'?'Message':'Check-in')}</p>
+ const finalAnswer=record.kind==='final'&&(data.finalFeedback||[]).find(f=>f.followup_id===record.id);
+ openDialog(esc(record.name),`<p class="sub">${esc(record.destination)} · ${t('Week of {date}',{date:dateLabel(record.week)})} · ${kindLabel(record)}</p>
  <p style="margin:14px 0">${pill(record)} ${record.mood?faces[record.mood]+' '+t(moods[record.mood]):''}</p>
  ${areaRows?`<ul class="area-list" aria-label="${t('How are these things going?')}">${areaRows}</ul>`:''}
  <strong>${esc(record.topic?t(record.topic):t('Student feedback'))}</strong><p class="record-text">${esc(record.note)||t('No written comment.')}</p>
  <p class="footnote">${t('Support requested:')} ${esc(needLabel(record.need))}</p><br>
  <form><label class="field">${t('Follow-up status')}<select name="status">${options(statuses)}</select></label><p class="error" role="alert"></p>
- <div class="actions"><button class="btn primary">${t('Save status')}</button><button type="button" class="btn" data-edit-response>${t('Edit response')}</button>${demo?'':removalButton('delete','feedback',record,t('Delete response'),'btn')}</div></form>`);
+ <div class="actions"><button class="btn primary">${t('Save status')}</button>${record.kind==='final'
+  ?(finalAnswer?`<button type="button" class="btn" data-open-final>${t('Open the final feedback')}</button>`:'')
+  :`<button type="button" class="btn" data-edit-response>${t('Edit response')}</button>`}${demo?'':removalButton('delete','feedback',record,t('Delete response'),'btn')}</div></form>`);
  const form=detail.querySelector('form');
- form.querySelector('[data-edit-response]').onclick=()=>editResponseDialog(record);
+ form.querySelector('[data-edit-response]')?.addEventListener('click',()=>editResponseDialog(record));
+ form.querySelector('[data-open-final]')?.addEventListener('click',()=>finalDialog(finalAnswer));
  const remove=form.querySelector('[data-removal]');
  if(remove)remove.onclick=()=>changeRemoval(remove,form);
  form.elements.status.value=record.status;
@@ -884,10 +1161,14 @@ function editResponseDialog(record){
  };
 }
 function addDialog(student){
- openDialog(t(student?'Edit student':'Add a student'),`<form>${textField('Full name','name','text','maxlength="100"')}${textField('Email','email','email','maxlength="254"')}${textField('Destination','destination','text','maxlength="120"')}${textField('Program start','start_date','date')}${textField('Program end','end_date','date')}<p class="error" role="alert"></p><button type="submit" class="btn primary">${t(student?'Save changes':'Add student')}</button></form>`);
+ openDialog(t(student?'Edit student':'Add a student'),`<form>${textField('Full name','name','text','maxlength="100"')}${textField('Email','email','email','maxlength="254"')}${textField('Destination','destination','text','maxlength="120"')}<div class="field-row">${textField('Program start','start_date','date')}${textField('Program end','end_date','date')}</div>
+  <div class="field-row"><label class="field">${t('Phone or WhatsApp (optional)')}<input name="phone" type="tel" maxlength="25" autocomplete="off"></label>
+  <label class="field">${t('Email language')}<select name="language"><option value="">${t('Automatic (Italian until the student chooses)')}</option><option value="it">Italiano</option><option value="en">English</option></select></label></div>
+  <label class="field">${t('Parent email for emergencies (optional)')}<input name="parent_email" type="email" maxlength="254"><small class="muted">${t('Never used for check-ins or the final feedback form.')}</small></label>
+  <p class="error" role="alert"></p><button type="submit" class="btn primary">${t(student?'Save changes':'Add student')}</button></form>`);
  const form=detail.querySelector('form');
  if(student){
-  for(const name of ['name','email','destination','start_date','end_date'])form.elements[name].value=student[name]??'';
+  for(const name of ['name','email','destination','start_date','end_date','phone','parent_email','language'])form.elements[name].value=student[name]??'';
  }
  form.onsubmit=async event=>{
   event.preventDefault();
@@ -948,6 +1229,30 @@ app.addEventListener('click',async event=>{
   if(student)addDialog(student);
  }
  if(action==='add-slots')availabilityDialog();
+ if(action==='recurring')recurringDialog();
+ if(action==='consultants')consultantsDialog();
+ if(action==='remove-examples')removeExamplesDialog();
+ if(action==='export-final')downloadFinal();
+ if(button.dataset.final){
+  const answer=(data.finalFeedback||[]).find(r=>r.id===button.dataset.final);
+  if(answer)finalDialog(answer);
+ }
+ if(button.dataset.finalStudent){
+  const student=data.students.find(s=>s.id===button.dataset.finalStudent);
+  if(student)finalStudentDialog(student);
+ }
+ if(button.dataset.studentPage){
+  const student=data.students.find(s=>s.id===button.dataset.studentPage);
+  if(student)studentDialog(student);
+ }
+ if(button.dataset.copyQuote){
+  const answer=(data.finalFeedback||[]).find(r=>r.id===button.dataset.copyQuote);
+  if(answer){
+   const quote=`“${answer.best||answer.advice}” — ${answer.name.split(' ')[0]}, ${answer.destination}`;
+   try{await navigator.clipboard.writeText(quote);button.textContent=t('Copied');}
+   catch{openDialog(t('Copy'),`<label class="field">${t('Copy this text')}<textarea readonly>${esc(quote)}</textarea></label>`);}
+  }
+ }
  // Staff calendar: month arrows, day, consultant.
  const {calMonth:month,calDay:pickedDay,calConsultant:pickedConsultant}=button.dataset;
  if(month||pickedDay||pickedConsultant){
@@ -1004,6 +1309,8 @@ async function formPage(){
  // Optional consultant call booking, offered when the student answers "Yes, it's urgent".
  // Order: pick a day on the calendar -> pick a consultant -> pick one of their times. The chosen slot travels in a hidden field.
  let slotsState='idle',slotList=[],slotPeople=[],chosenSlot='',pickDay='',pickConsultant='',viewMonth='';
+ // The consultant calls the student, so booking asks for a phone (filled in if we already have it). laterBooking = a call booked later from this link.
+ let bookingPhone=student.phone||'',laterBooking=null;
  async function loadSlots(){
   const {slots,consultants}=preview
    ?{slots:readDemo().slots.filter(s=>s.status==='open'&&s.starts_at>new Date().toISOString()),consultants:consultantList.map(([id,name])=>({id,name}))}
@@ -1042,7 +1349,8 @@ async function formPage(){
      return `<button type="button" class="slot-btn${chosenSlot===s.id?' selected':''}" data-cal-slot="${esc(s.id)}" aria-pressed="${chosenSlot===s.id}"><b>${callTime(s.starts_at)}</b>${local?`<small>${esc(local)}</small>`:''}</button>`;
     }).join('')}</div>`:`<p class="muted">${t('No times for {name} on this day.',{name:esc(person.name)})}</p>`}</div>`;
   const chosen=slotList.find(s=>s.id===chosenSlot);
-  const summary=chosen?`<p class="pick-summary" role="status">${t('Selected: {day} at {time} with {name}',{day:callDayLabel(chosen.starts_at,false),time:callTime(chosen.starts_at),name:esc(chosen.consultant_name)})}<button type="button" class="row-link" data-cal-clear="1">${t('No call for now')}</button></p>`:'';
+  const summary=chosen?`<p class="pick-summary" role="status">${t('Selected: {day} at {time} with {name}',{day:callDayLabel(chosen.starts_at,false),time:callTime(chosen.starts_at),name:esc(chosen.consultant_name)})}<button type="button" class="row-link" data-cal-clear="1">${t('No call for now')}</button></p>
+   <label class="field phone-field">${t('Your phone or WhatsApp number')}<input name="phone" type="tel" autocomplete="tel" maxlength="25" value="${esc(bookingPhone)}" placeholder="+39 333 123 4567"><small class="muted">${t('The consultant will call you on this number.')}</small></label>`:'';
   return head+`<input type="hidden" name="slot" value="${esc(chosenSlot)}"><div class="pick-layout"><div class="pick-step"><b>${t('Day')}</b>${monthGrid({month:viewMonth,selected:pickDay,counts,disabled:date=>!counts[date]?.open})}</div><div>${consultantStep}${timeStep}</div></div>${summary}`;
  }
  // Clicks inside the booking box: change month, day, consultant or time, then redraw the box.
@@ -1061,14 +1369,16 @@ async function formPage(){
    box.innerHTML=slotPicker();
    restore();
   });
+  box.addEventListener('input',event=>{if(event.target.name==='phone')bookingPhone=event.target.value;});
  }
+ const needsPhone=()=>{if(!bookingPhone.trim())throw new Error('Enter a phone number so the consultant can call you.');};
  function demoBook(slotId,record){
   const mock=readDemo();
   const existing=mock.slots.find(s=>s.feedback_id===record.id&&s.status==='booked');
   if(existing)return {status:'booked',slot:existing};
   const slot=mock.slots.find(s=>s.id===slotId);
   if(!slot||slot.status!=='open'||slot.starts_at<=new Date().toISOString())return {status:'taken'};
-  Object.assign(slot,{status:'booked',student_name:record.name,feedback_id:record.id,note:record.note||'',booked_at:new Date().toISOString()});
+  Object.assign(slot,{status:'booked',student_name:record.name,student_phone:bookingPhone,feedback_id:record.id,note:record.note||'',booked_at:new Date().toISOString()});
   saveDemo(mock);
   return {status:'booked',slot};
  }
@@ -1093,8 +1403,9 @@ async function formPage(){
    const slotId=new FormData(rebook).get('slot');
    try{
     if(!slotId)throw new Error('Choose a time first.');
+    needsPhone();
     button.disabled=true;
-    const result=preview?demoBook(slotId,record):(await request('/api/book',{token,feedback_id:record.id,slot:slotId})).booking;
+    const result=preview?demoBook(slotId,record):(await request('/api/book',{token,feedback_id:record.id,slot:slotId,phone:bookingPhone,language:lang})).booking;
     if(result.status!=='booked'){slotsState='idle';chosenSlot='';}
     thanks(message,result,record);
    }catch(error){showError(rebook,error);button.disabled=false;}
@@ -1105,17 +1416,37 @@ async function formPage(){
   app.innerHTML=shell(t(message?'Message your team':'Your weekly check-in'),`${student.name?t('Hi {name}. ',{name:esc(student.name.split(' ')[0])}):''}${t(message?'Send a question or ask for help.':'How has your week abroad been?')}`,`
    ${preview?`<p class="notice">${t('Sample form. Your response will appear in the sample workspace on this browser.')}</p>`:''}
    ${student.submitted?`<p class="notice">${t('Your check-in for this week is saved. You can still send a message.')}</p>`:''}
+   ${laterBooking?bookingSummary(laterBooking.slot)
+    :message&&!preview&&student.urgent&&!student.urgent.booked?`<section class="later-booking"><p class="notice">${t('You told us this week that it’s urgent. You can still book a call with a consultant.')}</p><form id="later-book" novalidate><section class="booking" id="booking">${slotPicker()}</section><p class="error" role="alert"></p><div class="actions"><button type="submit" class="btn primary">${t('Book call')}</button></div></form></section>`:''}
    <div class="actions" style="margin-bottom:17px">${student.submitted?'':`<button class="btn" id="switch-kind">${t(message?'Back to weekly check-in':'Send a separate message')}</button>`}</div>
-   <form>
+   <form id="checkin-form">
    ${message?'':`<fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:9px">${t('How are you feeling this week?')}</legend><div class="choices">${faces.slice(1).map((face,i)=>`<label><input type="radio" name="mood" value="${i+1}" required><span><b aria-hidden="true">${face}</b>${t(moods[i+1])}</span></label>`).join('')}</div></fieldset>
    <fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:4px">${t('How are these things going?')}</legend><div class="areas">${areas.map(([key,label])=>`<div class="area-row" role="radiogroup" aria-label="${t(label)}"><span class="area-name">${t(label)}</span><div class="scale">${ratings.map(([value,text])=>`<label><input type="radio" name="${key}" value="${value}" required><span class="${value}">${t(text)}</span></label>`).join('')}</div></div>`).join('')}</div></fieldset>`}
    <fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:9px">${t('Do you need support from us with anything?')}</legend><div class="support-options">${needs.map(([value,label])=>`<label><input type="radio" name="need" value="${value}" required><span>${t(label)}</span></label>`).join('')}</div></fieldset>
    ${message?'':'<section class="booking" id="booking" hidden></section>'}
    ${message?`<label class="field">${t('What is this about? (optional)')}<select name="topic"><option value="">${t('Choose a topic')}</option>${options(topics)}</select></label>`:''}
    <label class="field">${t(message?'What would you like to tell us?':'Anything else you’d like to tell us or ask? (optional)')}<textarea name="note" maxlength="2000" ${message?'required':''} placeholder="${t('A question, something that went well, or something you’d like help with')}"></textarea></label>
-   <p class="muted">${t('Your Gobeyond support team can read your response.')}</p><p class="error" role="alert"></p>
+   <p class="muted privacy-line">${t('Only the Go Beyond team can read your answers. We use them to support you and to improve our programs.')}</p><p class="error" role="alert"></p>
    <button type="submit" class="btn primary">${t(message?'Send message':'Submit check-in')}</button></form>`);
-  const element=app.querySelector('form');
+  const element=app.querySelector('#checkin-form');
+  // Book later: an urgent check-in this week without a call can still book one from this link.
+  const later=app.querySelector('#later-book');
+  if(later){
+   wireBooking(later.querySelector('#booking'));
+   later.onsubmit=async event=>{
+    event.preventDefault();
+    const button=later.querySelector('button[type=submit]');
+    const slotId=new FormData(later).get('slot');
+    try{
+     if(!slotId)throw new Error('Choose a time first.');
+     needsPhone();
+     button.disabled=true;
+     const result=(await request('/api/book',{token,feedback_id:student.urgent.id,slot:slotId,phone:bookingPhone,language:lang})).booking;
+     if(result.status==='booked'){student.urgent.booked=true;laterBooking=result;form(Object.fromEntries(new FormData(element)));}
+     else{slotsState='idle';chosenSlot='';later.querySelector('#booking').innerHTML=slotPicker();throw new Error('This time is no longer available. Choose another time.');}
+    }catch(error){showError(later,error);button.disabled=false;}
+   };
+  }
   // Keep anything the student already filled in when the language changes.
   for(const [name,value] of Object.entries(values))if(element.elements[name])element.elements[name].value=value;
   rerender=()=>form(Object.fromEntries(new FormData(element)));
@@ -1135,10 +1466,11 @@ async function formPage(){
    event.preventDefault();
    const button=element.querySelector('button[type=submit]');
    button.disabled=true;
-   const input={...Object.fromEntries(new FormData(element)),kind,token,id:submissionId};
-   if(message||input.need!=='urgent'||!input.slot)delete input.slot;
+   const input={...Object.fromEntries(new FormData(element)),kind,token,id:submissionId,language:lang};
+   if(message||input.need!=='urgent'||!input.slot){delete input.slot;delete input.phone;}
    try{
     if(message&&!input.note.trim())throw new Error('Enter a message before sending.');
+    if(input.slot)needsPhone();
     let booking=null;
     const record={id:submissionId,name:'Sample submission',note:input.note||''};
     if(preview){
@@ -1158,6 +1490,350 @@ async function formPage(){
   };
  }
  form();
+}
+// ===== Shared helpers for the new staff views =====
+const average=values=>{const known=values.filter(v=>v!=null&&v!=='').map(Number);return known.length?known.reduce((a,b)=>a+b,0)/known.length:null;};
+const oneDecimal=n=>n==null?'—':new Intl.NumberFormat(locale(),{minimumFractionDigits:1,maximumFractionDigits:1}).format(n);
+const stars=n=>`<span class="stars" role="img" aria-label="${n}/5">${'★'.repeat(n)}<span class="dim">${'★'.repeat(5-n)}</span></span>`;
+const weekShift=(week,n)=>new Date(Date.parse(week+'T12:00:00Z')+n*7*86400000).toISOString().slice(0,10);
+// A small line chart of mood (1-5) over weeks: faces on the left, week labels underneath.
+function moodChart(points){
+ const W=560,H=170,left=40,right=14,top=12,bottom=34;
+ const x=i=>left+i*(W-left-right)/Math.max(1,points.length-1);
+ const y=v=>top+(5-v)/4*(H-top-bottom);
+ const known=points.map((p,i)=>({...p,i})).filter(p=>p.value!=null);
+ const line=known.map((p,j)=>`${j?'L':'M'}${x(p.i).toFixed(1)} ${y(p.value).toFixed(1)}`).join('');
+ return `<svg class="mood-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${t('Average mood')}">${[1,2,3,4,5].map(v=>`<line x1="${left}" x2="${W-right}" y1="${y(v)}" y2="${y(v)}" class="grid"/><text x="${left-10}" y="${y(v)+5}" text-anchor="end" class="axis">${faces[v]}</text>`).join('')}
+  <path d="${line}" class="line"/>${known.map(p=>`<circle cx="${x(p.i)}" cy="${y(p.value)}" r="4.5" class="dot"><title>${esc(p.label)}: ${oneDecimal(p.value)}${p.n>1?` (${p.n})`:''}</title></circle>`).join('')}
+  ${points.map((p,i)=>`<text x="${x(i)}" y="${H-10}" text-anchor="middle" class="axis">${esc(p.label)}</text>`).join('')}</svg>`;
+}
+// Overview: average mood and "Difficult" answers per area over the last 8 weeks, optionally for one destination.
+let trendDest='all';
+function trendsCard(){
+ if(!data.feedback.some(r=>r.kind==='check-in'))return '';
+ const weeks=[...Array(8)].map((_,i)=>weekShift(data.week,i-7));
+ const destinations=[...new Set(data.students.map(s=>s.destination))].sort();
+ const checks=data.feedback.filter(r=>r.kind==='check-in'&&weeks.includes(r.week)&&(trendDest==='all'||r.destination===trendDest));
+ const perWeek=weeks.map(week=>{const rows=checks.filter(r=>r.week===week);return {week,n:rows.length,mood:average(rows.map(r=>r.mood)),hard:Object.fromEntries(areas.map(([key])=>[key,rows.filter(r=>r[key]==='difficult').length]))};});
+ const most=Math.max(1,...perWeek.flatMap(p=>Object.values(p.hard)));
+ const heat=`<div class="table-wrap"><table class="heat"><thead><tr><th>${t('“Difficult” answers')}</th>${perWeek.map(p=>`<th>${dateLabel(p.week)}</th>`).join('')}</tr></thead><tbody>${areas.map(([key,label])=>`<tr><td>${t(label)}</td>${perWeek.map(p=>`<td class="heat-cell level-${p.hard[key]?Math.ceil(p.hard[key]/most*3):0}">${p.hard[key]||''}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+ return `<section class="card trends"><div class="card-head"><div><h2>${t('Trends over the last 8 weeks')}</h2><p>${t('Average mood and “Difficult” answers per area, from weekly check-ins.')}</p></div><select id="trend-dest" aria-label="${t('Destination')}" style="width:auto"><option value="all">${t('All destinations')}</option>${destinations.map(x=>`<option value="${esc(x)}" ${x===trendDest?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
+  <div class="trend-body"><div><h3>${t('Average mood')}</h3>${moodChart(perWeek.map(p=>({label:dateLabel(p.week),value:p.mood,n:p.n})))}</div><div><h3>${t('Where students struggle')}</h3>${heat}</div></div></section>`;
+}
+// Settings: who did what.
+function activityCard(){
+ return `<section class="card" style="margin-top:16px"><div class="card-head"><div><h2>${t('Recent activity')}</h2><p>${t('Who did what in the workspace.')}</p></div></div>${table(['When','Who','What','Details'],(data.activity||[]).map(a=>`<tr><td>${dateLabel(a.at,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</td><td>${esc(a.actor)}</td><td>${esc(capital(t(a.action)))}</td><td class="note-cell">${esc(a.details||'')}</td></tr>`),'No activity yet.')}</section>`;
+}
+// Staff student page: contact details, mood week by week, the five areas, every response, calls and the final feedback.
+function studentDialog(s){
+ const rows=data.feedback.filter(r=>r.student_id===s.id).sort((a,b)=>a.created_at.localeCompare(b.created_at));
+ const checks=rows.filter(r=>r.kind==='check-in').slice(-8);
+ const ids=new Set(rows.map(r=>r.id));
+ const calls=(data.slots||[]).filter(x=>x.feedback_id&&ids.has(x.feedback_id)).sort((a,b)=>a.starts_at.localeCompare(b.starts_at));
+ const final=(data.finalFeedback||[]).find(r=>r.student_id===s.id);
+ const facts=[['Email',esc(s.email)],['Phone or WhatsApp',s.phone?phoneLink(s.phone):'—'],['Parent email (emergencies)',s.parent_email?esc(s.parent_email):'—'],
+  ['Email language',s.language==='en'?'English':s.language==='it'?'Italiano':t('Automatic')],['Program dates',`${dateLabel(s.start_date)} – ${dateLabel(s.end_date)}`]];
+ const grid=`<div class="table-wrap"><table class="heat"><thead><tr><th>${t('Week of')}</th>${areas.map(([,label])=>`<th>${t(label)}</th>`).join('')}</tr></thead><tbody>${checks.map(r=>`<tr><td>${dateLabel(r.week)}</td>${areas.map(([key])=>`<td>${r[key]?`<span class="pill ${ratingClass(r[key])}">${esc(ratingLabel(r[key]))}</span>`:'—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+ openDialog(esc(s.name),`<p class="sub">${esc(s.destination)}</p>
+  <dl class="facts">${facts.map(([k,v])=>`<div><dt>${t(k)}</dt><dd>${v}</dd></div>`).join('')}</dl>
+  ${checks.length?`<h3>${t('Mood week by week')}</h3>${moodChart(checks.map(r=>({label:dateLabel(r.week),value:r.mood,n:1})))}<h3>${t('How things went, week by week')}</h3>${grid}`:`<p class="empty">${t('No weekly check-ins yet.')}</p>`}
+  <h3>${t('All responses')}</h3>${rows.length?`<ul class="timeline">${rows.slice().reverse().map(r=>`<li><button class="row-link" data-open-record="${esc(r.id)}">${dateLabel(r.created_at)} · ${kindLabel(r)}</button> ${pill(r)} <span class="muted">${esc((r.note||areaSummary(r)||'').slice(0,120))}</span></li>`).join('')}</ul>`:`<p class="empty">${t('No responses yet.')}</p>`}
+  <h3>${t('Calls')}</h3>${calls.length?`<ul class="timeline">${calls.map(c=>`<li>${callDayLabel(c.starts_at)} ${callTime(c.starts_at)} · ${esc(c.consultant_name)} <span class="pill ${slotClass(c.status)}">${slotLabel(c.status)}</span></li>`).join('')}</ul>`:`<p class="empty">${t('No calls booked.')}</p>`}
+  <h3>${t('Final feedback')}</h3>${final?`<p>${stars(final.overall)} · ${t('Recommend')}: ${final.recommend}/10 · <button class="row-link" data-open-final-answer>${t('View answers')}</button></p>`:`<p class="empty">${t('Not received yet.')}</p>`}`,true);
+ detail.querySelectorAll('[data-open-record]').forEach(b=>{b.onclick=()=>recordDialog(data.feedback.find(r=>r.id===b.dataset.openRecord));});
+ detail.querySelector('[data-open-final-answer]')?.addEventListener('click',()=>finalDialog(final));
+}
+// Consultants: add, edit, deactivate (inactive = hidden from students and from new availability).
+function consultantsDialog(editing=null){
+ const people=consultantsOf();
+ const c=editing||{id:'',name:'',phone:'',email:'',active:1};
+ openDialog(t('Consultants'),`${table(['Consultant','Phone','Email','Status',''],people.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.phone)}</td><td>${esc(p.email||'—')}</td><td><span class="pill ${isActive(p)?'resolved':'cancelled'}">${t(isActive(p)?'Active':'Inactive')}</span></td><td><button class="row-link" data-edit-consultant="${esc(p.id)}">${t('Edit')}</button></td></tr>`))}
+  <form class="consultant-form"><h3>${c.id?t('Edit {name}',{name:esc(c.name)}):t('Add a consultant')}</h3>
+  <div class="field-row"><label class="field">${t('Name')}<input name="name" required maxlength="60" value="${esc(c.name)}"></label><label class="field">${t('Phone')}<input name="phone" type="tel" required maxlength="25" value="${esc(c.phone)}"></label></div>
+  <label class="field">${t('Email (gets a copy of booking emails)')}<input name="email" type="email" maxlength="254" value="${esc(c.email||'')}"></label>
+  <label class="check"><input type="checkbox" name="active" ${isActive(c)?'checked':''}> ${t('Active: students can book this consultant')}</label>
+  <p class="error" role="alert"></p><div class="actions"><button class="btn primary">${t(c.id?'Save changes':'Add consultant')}</button>${c.id?`<button type="button" class="btn" data-new-consultant>${t('Add a new consultant instead')}</button>`:''}</div></form>`,true);
+ detail.querySelectorAll('[data-edit-consultant]').forEach(b=>{b.onclick=()=>consultantsDialog(people.find(p=>p.id===b.dataset.editConsultant));});
+ detail.querySelector('[data-new-consultant]')?.addEventListener('click',()=>consultantsDialog());
+ const form=detail.querySelector('form');
+ form.onsubmit=async event=>{
+  event.preventDefault();
+  const v=Object.fromEntries(new FormData(form));
+  const payload={id:c.id,name:(v.name||'').trim(),phone:(v.phone||'').trim(),email:(v.email||'').trim(),active:!!v.active};
+  try{
+   if(demo){
+    if(!payload.name||(payload.phone.match(/\d/g)||[]).length<6)throw new Error('Check the consultant’s name, phone and email.');
+    data.consultants??=consultantsOf();
+    if(c.id){
+     Object.assign(data.consultants.find(p=>p.id===c.id),{...payload,active:payload.active?1:0});
+     for(const slot of data.slots)if(consultantOf(slot)===c.id)Object.assign(slot,{consultant_name:payload.name,consultant_phone:payload.phone});
+    }else data.consultants.push({...payload,id:payload.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-'+Math.random().toString(16).slice(2,6),active:payload.active?1:0});
+    saveDemo(data);
+   }else{await request('/api/consultants/save',payload);data=await request('/api/data');}
+   render();consultantsDialog();
+  }catch(error){showError(form,error);}
+ };
+}
+// Recurring availability: weekdays x time blocks (default 09:00-12:30 and 14:00-18:00, Italian time) for a number of weeks.
+function recurringDialog(){
+ const people=consultantsOf().filter(isActive);
+ const nextMonday=[...Array(7)].map((_,i)=>dateAfter(i+1)).find(d=>new Date(d+'T12:00:00Z').getUTCDay()===1);
+ const dayNames=[1,2,3,4,5,6,7].map(n=>[n,capital(new Intl.DateTimeFormat(locale(),{weekday:'short',timeZone:'UTC'}).format(new Date(Date.UTC(2024,0,n))))]);
+ openDialog(t('Recurring availability'),`<form>
+  <label class="field">${t('Consultant')}<select name="consultant_id"><option value="all">${t('All active consultants')}</option>${people.map(c=>`<option value="${esc(c.id)}" ${c.id===calConsultant?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
+  <fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:8px">${t('Days')}</legend><div class="day-picks">${dayNames.map(([n,name])=>`<label><input type="checkbox" name="weekdays" value="${n}" ${n<=5?'checked':''}><span>${esc(name)}</span></label>`).join('')}</div></fieldset>
+  <fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:8px">${t('Time blocks (Italian time)')}</legend>
+   <div class="field-row"><label class="field">${t('Morning from')}<input name="from1" type="time" step="300" value="09:00"></label><label class="field">${t('to')}<input name="to1" type="time" step="300" value="12:30"></label></div>
+   <div class="field-row"><label class="field">${t('Afternoon from')}<input name="from2" type="time" step="300" value="14:00"></label><label class="field">${t('to')}<input name="to2" type="time" step="300" value="18:00"></label></div>
+   <small class="muted">${t('Leave a block empty to skip it.')}</small></fieldset>
+  <div class="field-row three"><label class="field">${t('Call length')}<select name="minutes">${callLengths.map(n=>`<option value="${n}" ${n===30?'selected':''}>${t('{n} minutes',{n})}</option>`).join('')}</select></label>
+   <label class="field">${t('Starting')}<input name="start_date" type="date" required min="${callDay(new Date().toISOString())}" value="${nextMonday}"></label>
+   <label class="field">${t('Number of weeks')}<select name="weeks">${[1,2,3,4,6,8,12].map(n=>`<option value="${n}" ${n===4?'selected':''}>${n}</option>`).join('')}</select></label></div>
+  <p class="slot-preview" id="recurring-preview"></p><p class="error" role="alert"></p><button class="btn primary">${t('Add these times')}</button></form>`,true);
+ const form=detail.querySelector('form');
+ const values=()=>{const f=new FormData(form);return {consultant_id:f.get('consultant_id'),weekdays:f.getAll('weekdays').map(Number),
+  blocks:[[f.get('from1'),f.get('to1')],[f.get('from2'),f.get('to2')]].filter(([from,to])=>from&&to).map(([from,to])=>({from,to})),
+  minutes:Number(f.get('minutes')),start_date:f.get('start_date'),weeks:Number(f.get('weeks'))};};
+ const preview=()=>{
+  const v=values();
+  const perDay=v.blocks.reduce((n,b)=>n+(b.to>b.from?rangeTimes(b.from,b.to,v.minutes).length:0),0);
+  const count=v.consultant_id==='all'?people.length:1;
+  form.querySelector('#recurring-preview').textContent=perDay&&v.weekdays.length
+   ?t('About {n} times in total ({per} per consultant per day). Times in the past or already taken are skipped.',{n:perDay*v.weekdays.length*v.weeks*count,per:perDay}):'';
+ };
+ form.addEventListener('input',preview);form.addEventListener('change',preview);preview();
+ form.onsubmit=async event=>{
+  event.preventDefault();
+  const v=values(),button=form.querySelector('button');
+  try{
+   if(!v.weekdays.length||!v.blocks.length||!v.start_date)throw new Error('Choose consultants, days, time blocks, a start date and a number of weeks.');
+   button.disabled=true;
+   let result;
+   if(demo)result=demoRecurring(v);
+   else{result=await request('/api/slots/recurring',v);data=await request('/api/data');}
+   calDay=v.start_date;calMonth=v.start_date.slice(0,7);if(v.consultant_id!=='all')calConsultant=v.consultant_id;
+   detail.close();render();
+   document.querySelector('#page-status').textContent=t('Times added: {count}. Skipped: {skipped}.',{count:result.added,skipped:result.skipped});
+  }catch(error){showError(form,error);button.disabled=false;}
+ };
+}
+function demoRecurring(v){
+ const people=v.consultant_id==='all'?consultantsOf().filter(isActive):consultantsOf().filter(c=>c.id===v.consultant_id);
+ const nowIso=new Date().toISOString();
+ let added=0,skipped=0;
+ for(let offset=0;offset<v.weeks*7;offset++){
+  const date=new Date(Date.parse(v.start_date+'T12:00:00Z')+offset*86400000).toISOString().slice(0,10);
+  if(!v.weekdays.includes((new Date(date+'T12:00:00Z').getUTCDay()+6)%7+1))continue;
+  for(const block of v.blocks)for(const time of rangeTimes(block.from,block.to,v.minutes))for(const p of people){
+   const starts_at=italianTime(date,time),ends_at=new Date(Date.parse(starts_at)+v.minutes*60000).toISOString();
+   if(starts_at<=nowIso||data.slots.some(s=>consultantOf(s)===p.id&&s.status!=='cancelled'&&s.starts_at<ends_at&&s.ends_at>starts_at)){skipped++;continue;}
+   data.slots.push({id:crypto.randomUUID(),consultant_id:p.id,starts_at,ends_at,status:'open',consultant_name:p.name,consultant_phone:p.phone,student_name:null,feedback_id:null,note:null});
+   added++;
+  }
+ }
+ saveDemo(data);
+ return {added,skipped};
+}
+function removeExamplesDialog(){
+ const count=(data.slots||[]).filter(s=>s.status==='open'&&exampleSlotId(s.id)).length;
+ confirmDialog(t('Remove example times?'),t('{n} open example times were created when the app first started.',{n:count}),
+  t('Booked and cancelled calls stay. Times you added yourself are not touched.'),t('Remove example times'),t('Keep them'),
+  async()=>{
+   if(demo){data.slots=data.slots.filter(s=>!(s.status==='open'&&exampleSlotId(s.id)));saveDemo(data);}
+   else{await request('/api/slots/remove-examples',{});data=await request('/api/data');}
+  });
+}
+
+// ===== Final feedback (end of journey) =====
+// Questions 4-9: [key, short name for staff, question for students]; question 4 depends on where they lived; travel is optional.
+const finalTopicList=[['housing','Host family / boarding house',''],['school','School and teaching','School life and the quality of teaching'],
+ ['social','Friends','Making friends with international and local students'],['local_support','Local Coordinator / Tutor','Support on site from your Local Coordinator and/or Tutor'],
+ ['team_support','Go Beyond team','Support from the Go Beyond team in Italy, before and during your stay'],['travel','Travel and arrival','Travel and arrival organisation']];
+const finalRequired=['housing','school','social','local_support','team_support'];
+const housingLabels={family:'Host family',boarding:'Boarding house',other:'Other'};
+const housingQuestion=type=>type==='boarding'?'Life in the boarding house':type==='family'?'Life with your host family':'Life with your host family / in the boarding house';
+const scaleWord=n=>tIn('scale',['Very poor','Poor','Fair','Good','Excellent'].at(n-1));
+const npsGroup=n=>n>=9?'promoter':n>=7?'passive':'detractor';
+const npsLabel=n=>t(npsGroup(n)==='promoter'?'Promoter':npsGroup(n)==='passive'?'Passive':'Detractor');
+const npsScore=rows=>rows.length?Math.round((rows.filter(r=>r.recommend>=9).length-rows.filter(r=>r.recommend<=6).length)/rows.length*100):null;
+const lowTopics=r=>finalRequired.filter(k=>r[k]!=null&&r[k]<=2);
+const finalLink=s=>location.origin+'/final#'+s.token;
+let finalDest='all',finalMonth='all',finalQuotes=false;
+function finalView(){
+ const rows=data.finalFeedback||[];
+ const people=new Map(data.students.map(s=>[s.id,s]));
+ for(const r of rows)if(!people.has(r.student_id))people.set(r.student_id,{id:r.student_id,destination:r.destination,end_date:r.end_date});
+ const invitedIds=new Set([...(data.finalInvited||[]),...rows.map(r=>r.student_id)]);
+ const pool=[...invitedIds].map(id=>people.get(id)).filter(Boolean);
+ const inFilter=s=>(finalDest==='all'||s.destination===finalDest)&&(finalMonth==='all'||(s.end_date||'').slice(0,7)===finalMonth);
+ const responses=rows.filter(inFilter), invited=pool.filter(inFilter).length;
+ const destinations=[...new Set(pool.map(s=>s.destination))].sort();
+ const months=[...new Set(pool.map(s=>(s.end_date||'').slice(0,7)))].filter(Boolean).sort().reverse();
+ const monthName=m=>capital(new Intl.DateTimeFormat(locale(),{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(m+'-15T12:00:00Z')));
+ const rate=invited?Math.round(responses.length/invited*100):null, nps=npsScore(responses);
+ const bars=finalTopicList.map(([key,name])=>{const avg=average(responses.map(r=>r[key]));
+  return `<div class="topic-bar"><span class="topic-name">${t(name)}</span><span class="bar-track"><span class="bar-fill${avg!=null&&avg<3?' low':''}" style="width:${avg==null?0:avg/5*100}%"></span></span><b>${oneDecimal(avg)}</b></div>`;}).join('');
+ const quotes=responses.filter(r=>r.share_consent&&(r.best||r.advice));
+ const list=finalQuotes
+  ?(quotes.length?`<div class="quotes">${quotes.map(r=>`<figure class="quote"><blockquote>${esc(r.best||r.advice)}</blockquote>${r.best&&r.advice?`<p class="muted">${t('Advice')}: ${esc(r.advice)}</p>`:''}<figcaption>${esc(r.name.split(' ')[0])} · ${esc(r.destination)} · ${stars(r.overall)}</figcaption><button class="row-link" data-copy-quote="${esc(r.id)}">${t('Copy')}</button></figure>`).join('')}</div>`
+   :`<p class="empty">${t('No testimonials with consent yet.')}</p>`)
+  :table(['Student','Program end','Overall','Recommend','Low scores',''],responses.map(r=>`<tr><td>${person(r)}</td><td>${dateLabel(r.end_date)}</td><td>${stars(r.overall)}</td><td>${r.recommend} <span class="pill ${npsGroup(r.recommend)}">${npsLabel(r.recommend)}</span></td><td>${lowTopics(r).map(k=>`<span class="pill follow">${t(finalTopicList.find(x=>x[0]===k)[1])}</span>`).join(' ')||'—'}</td><td><button class="row-link" data-final="${esc(r.id)}">${t('View')}</button></td></tr>`),
+   'Final feedback appears here when students finish their program and answer the form.');
+ return title('Final feedback','What students tell us when their program ends.',btn('Export CSV','export-final','download')+`<a class="btn primary" href="/final?demo=1" target="_blank" rel="noopener">${icon('link',16)} ${t('Preview final form')}</a>`)+
+  `<section class="card"><div class="filters final-filters"><select id="final-dest" aria-label="${t('Destination')}" style="width:auto"><option value="all">${t('All destinations')}</option>${destinations.map(x=>`<option value="${esc(x)}" ${x===finalDest?'selected':''}>${esc(x)}</option>`).join('')}</select>
+   <select id="final-month" aria-label="${t('Program end')}" style="width:auto"><option value="all">${t('All end months')}</option>${months.map(m=>`<option value="${m}" ${m===finalMonth?'selected':''}>${monthName(m)}</option>`).join('')}</select>
+   <label class="check"><input type="checkbox" id="final-quotes" ${finalQuotes?'checked':''}> ${t('Testimonials only')}</label></div></section>
+  <section class="metrics" aria-label="${t('Final feedback summary')}">
+   ${metric('Invited',invited,t('Students sent the form'),'final')}
+   ${metric('Responses received',responses.length,rate==null?t('No invitations yet'):t('{rate}% response rate',{rate}),'feedback','green')}
+   ${metric('Overall rating',oneDecimal(average(responses.map(r=>r.overall))),t('Average out of 5'),'final','purple')}
+   ${metric('Recommendation score',nps==null?'—':(nps>0?'+':'')+nps,t('NPS: % 9–10 minus % 0–6'),'students','orange')}
+  </section>
+  <section class="grid">
+   <div class="card"><div class="card-head"><div><h2>${t(finalQuotes?'Testimonials':'Responses')}</h2><p>${t(finalQuotes?'Only students who agreed to share their words.':'Newest first')}</p></div></div>${list}</div>
+   <div class="card"><div class="card-head"><div><h2>${t('Average by topic')}</h2><p>${t('Out of 5. Below 3 is highlighted.')}</p></div></div><div class="topic-bars">${bars}</div></div>
+  </section>`;
+}
+function finalDialog(r){
+ const follow=r.followup_id&&data.feedback.find(f=>f.id===r.followup_id);
+ const topics=finalTopicList.map(([key,name])=>r[key]==null?'':`<li><span>${t(name)}${r[key+'_comment']?`<small>${esc(r[key+'_comment'])}</small>`:''}</span><span class="pill ${r[key]<=2?'follow':r[key]>=4?'resolved':''}">${r[key]} · ${scaleWord(r[key])}</span></li>`).join('');
+ openDialog(esc(r.name),`<p class="sub">${esc(r.destination)} · ${t('Program end')} ${dateLabel(r.end_date)} · ${t('Sent on {date}',{date:dateLabel(r.submitted_at)})} · ${r.language==='it'?'Italiano':'English'}</p>
+  <div class="final-score"><div><b>${stars(r.overall)}</b><small>${t('Overall')}</small></div><div><b>${r.recommend}/10</b><small>${npsLabel(r.recommend)}</small></div><div><b>${t(housingLabels[r.housing_type]||'Other')}</b><small>${t('Where they lived')}</small></div></div>
+  <ul class="area-list final-topics">${topics}</ul>
+  ${[['best','Best part'],['improve','Hardest part / to improve'],['advice','Advice for future students']].map(([k,label])=>r[k]?`<strong>${t(label)}</strong><p class="record-text">${esc(r[k])}</p>`:'').join('')}
+  <p class="footnote">${t('Share comments publicly')}: <b>${t(r.share_consent?'Yes':'No')}</b> · ${t('Future programs')}: <b>${r.future_contact==null?'—':t(r.future_contact?'Yes':'No')}</b></p>
+  ${follow?`<div class="actions" style="margin-top:14px"><button class="btn" data-open-follow>${t('Open the follow-up')}</button></div>`:''}`);
+ detail.querySelector('[data-open-follow]')?.addEventListener('click',()=>recordDialog(follow));
+}
+// From the Students tab: the student's final feedback status, link and "send now".
+function finalStudentDialog(s){
+ const answer=(data.finalFeedback||[]).find(r=>r.student_id===s.id);
+ const invited=(data.finalInvited||[]).includes(s.id);
+ const status=answer?t('Received on {date}',{date:dateLabel(answer.submitted_at)}):invited?t('Sent, waiting for an answer'):t('Not sent yet');
+ openDialog(t('Final feedback form'),`<p class="sub">${esc(s.name)} · ${t('Program end')} ${dateLabel(s.end_date)}</p><p class="footnote"><span class="pill ${answer?'resolved':''}">${status}</span></p><br>
+  <p class="muted">${t('The form opens 3 days before the end of the program and closes 30 days after it. The invitation is sent automatically on the end date, with reminders after 4 and 10 days.')}</p><br>
+  ${s.token?`<label class="field">${t('Final feedback link')}<input readonly value="${esc(finalLink(s))}"></label>`:`<p class="muted">${t('Sample student')}</p>`}
+  <form><p class="error" role="alert"></p><div class="actions">${answer||!s.token?'':`<button class="btn primary">${t('Send the form by email now')}</button>`}${s.token?`<button type="button" class="btn" data-copy-final>${t('Copy link')}</button>`:''}${answer?`<button type="button" class="btn" data-view-final>${t('View answers')}</button>`:''}</div><p class="footnote" role="status" id="final-send-status"></p></form>`);
+ const form=detail.querySelector('form');
+ detail.querySelector('[data-copy-final]')?.addEventListener('click',async()=>{
+  try{await navigator.clipboard.writeText(finalLink(s));form.querySelector('#final-send-status').textContent=t('Link copied.');}catch{detail.querySelector('input[readonly]')?.select();}
+ });
+ detail.querySelector('[data-view-final]')?.addEventListener('click',()=>finalDialog(answer));
+ form.onsubmit=async event=>{
+  event.preventDefault();
+  const button=form.querySelector('button.primary');
+  try{
+   button.disabled=true;
+   await request('/api/final/send',{id:s.id});
+   data=await request('/api/data');render();
+   form.querySelector('#final-send-status').textContent=t('Sent.');
+  }catch(error){showError(form,error);button.disabled=false;}
+ };
+}
+function downloadFinal(){
+ const yesNo=v=>v==null?'':t(v?'Yes':'No');
+ const cols=[[t('Sent on'),r=>r.submitted_at],[t('Student'),r=>r.name],[t('Destination'),r=>r.destination],[t('Program end'),r=>r.end_date],[t('Overall'),r=>r.overall],[t('Recommend (0–10)'),r=>r.recommend],
+  [t('Where they lived'),r=>t(housingLabels[r.housing_type]||'Other')],
+  ...finalTopicList.flatMap(([key,name])=>[[t(name),r=>r[key]??''],...(key==='travel'?[]:[[t(name)+' – '+t('comment'),r=>r[key+'_comment']]])]),
+  [t('Best part'),r=>r.best],[t('Hardest part / to improve'),r=>r.improve],[t('Advice for future students'),r=>r.advice],
+  [t('Share comments publicly'),r=>yesNo(r.share_consent)],[t('Future programs'),r=>yesNo(r.future_contact)],[t('Language'),r=>r.language]];
+ const cell=value=>{let raw=String(value??'');if(/^[\s]*[=+@-]|^[\t\r\n]/.test(raw))raw="'"+raw;return '"'+raw.replaceAll('"','""')+'"';};
+ const csv=[cols.map(c=>cell(c[0])).join(','),...(data.finalFeedback||[]).map(r=>cols.map(c=>cell(c[1](r))).join(','))].join('\r\n');
+ const url=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
+ const a=document.createElement('a');a.href=url;a.download='gobeyond-final-feedback-'+data.day+'.csv';a.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+// The student's final feedback form: three short steps, answers kept across steps and language switches.
+async function finalPage(){
+ const query=new URLSearchParams(location.search),preview=query.has('demo'),token=location.hash.slice(1);
+ const shell=(heading,sub,body)=>`<main class="formpage">${formTop()}<section class="hero"><div><div class="eyebrow">${icon('final',16)} ${t('End of your journey')}</div><h2>${heading}</h2><p>${sub}</p></div></section><section class="card formbody">${body}</section></main>`;
+ let info;
+ try{info=preview?{name:'',submitted:false}:await request('/api/final',{token});}
+ catch(error){const page=()=>{app.innerHTML=shell(t('Your Go Beyond experience'),t('Tell us how your program went.'),`<p class="error">${esc(t(error.message))}</p>`);};rerender=page;page();return;}
+ const finished=already=>{const page=()=>{app.innerHTML=shell(t('Thank you!'),t(already?'You have already sent your final feedback.':'Your final feedback has been saved.'),
+  `<p class="muted">${t('Thank you for helping us make Go Beyond better for the students who come after you.')}</p>${preview?`<a href="/?demo=1" class="btn">${t('Open sample workspace')}</a>`:''}`);};rerender=page;page();};
+ if(info.submitted){finished(true);return;}
+ const answers={share_consent:'no'}, opened=new Set();
+ let step=1;
+ const stepNames=['Overall','Your stay','Your words'];
+ const filled=key=>answers[key]!=null&&answers[key]!=='';
+ const scale=(name,label)=>`<div class="scale5" role="radiogroup" aria-label="${esc(label)}">${[1,2,3,4,5].map(n=>`<label><input type="radio" name="${name}" value="${n}" ${String(answers[name])===String(n)?'checked':''}><span><b>${n}</b><small>${scaleWord(n)}</small></span></label>`).join('')}</div>`;
+ const topicBlock=([key,,question])=>{
+  const label=key==='housing'?t(housingQuestion(answers.housing_type)):t(question);
+  const low=finalRequired.includes(key)&&filled(key)&&Number(answers[key])<=2;
+  const show=low||opened.has(key)||(answers[key+'_comment']||'').trim();
+  return `<fieldset class="final-topic"><legend>${label}${finalRequired.includes(key)?'':` <span class="muted">${t('(optional)')}</span>`}</legend>${scale(key,label)}
+   ${key==='travel'?'':show?`<label class="field comment-field">${t(low?'Tell us what went wrong':'Comment (optional)')}<textarea name="${key}_comment" maxlength="1000" rows="2">${esc(answers[key+'_comment']||'')}</textarea></label>`
+    :`<button type="button" class="row-link add-comment" data-open-comment="${key}">+ ${t('Add a comment')}</button>`}</fieldset>`;
+ };
+ const yesNo=(name,question,optional=false)=>`<fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:9px">${t(question)}${optional?` <span class="muted">${t('(optional)')}</span>`:''}</legend><div class="support-options yes-no">${[['yes','Yes'],['no','No']].map(([v,l])=>`<label><input type="radio" name="${name}" value="${v}" ${answers[name]===v?'checked':''}><span>${t(l)}</span></label>`).join('')}</div></fieldset>`;
+ const body=()=>step===1
+  ?`<fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:9px">${t('Overall, how was your experience abroad?')}</legend>${scale('overall',t('Overall, how was your experience abroad?'))}</fieldset>
+   <fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:9px">${t('How likely are you to recommend Go Beyond to a friend?')}</legend><div class="nps" role="radiogroup" aria-label="${t('How likely are you to recommend Go Beyond to a friend?')}">${[...Array(11).keys()].map(n=>`<label><input type="radio" name="recommend" value="${n}" ${String(answers.recommend)===String(n)?'checked':''}><span>${n}</span></label>`).join('')}</div><div class="nps-ends"><span>0 · ${t('Not at all likely')}</span><span>10 · ${t('Extremely likely')}</span></div></fieldset>`
+  :step===2
+  ?`<fieldset class="field" style="border:0;padding:0"><legend style="margin-bottom:9px">${t('Where did you live?')}</legend><div class="support-options housing-options">${Object.entries(housingLabels).map(([v,l])=>`<label><input type="radio" name="housing_type" value="${v}" ${answers.housing_type===v?'checked':''}><span>${t(l)}</span></label>`).join('')}</div></fieldset>
+   <p class="muted rate-hint">${t('Rate each part of your stay from 1 (very poor) to 5 (excellent).')}</p>${finalTopicList.map(topicBlock).join('')}`
+  :`<label class="field">${t('What was the best part of your experience?')} <span class="muted">${t('(optional)')}</span><textarea name="best" maxlength="2000">${esc(answers.best||'')}</textarea></label>
+   <label class="field">${t('What was the hardest part, or what should we improve?')} <span class="muted">${t('(optional)')}</span><textarea name="improve" maxlength="2000">${esc(answers.improve||'')}</textarea></label>
+   <label class="field">${t('One piece of advice for a student leaving for the same destination')} <span class="muted">${t('(optional)')}</span><textarea name="advice" maxlength="2000">${esc(answers.advice||'')}</textarea></label>
+   ${yesNo('share_consent','Can we share your comments with your first name and destination on our website and social media?')}
+   ${yesNo('future_contact','Would you like to hear about future Go Beyond programs?',true)}`;
+ const missing=()=>{throw new Error('Please complete the required fields.');};
+ const validate=()=>{
+  if(step===1&&(!filled('overall')||!filled('recommend')))missing();
+  if(step===2){
+   if(!filled('housing_type')||finalRequired.some(key=>!filled(key)))missing();
+   if(finalRequired.some(key=>Number(answers[key])<=2&&!(answers[key+'_comment']||'').trim()))throw new Error('Tell us what went wrong for each topic you rated 1 or 2.');
+  }
+  if(step===3&&!filled('share_consent'))missing();
+ };
+ const saveDemoFinal=p=>{
+  const mock=readDemo(), finalId='final-'+crypto.randomUUID(), num=k=>p[k]===''||p[k]==null?null:Number(p[k]);
+  const row={id:finalId,student_id:'preview',name:'Sample submission',destination:'Demo',end_date:day,submitted_at:new Date().toISOString(),language:lang,
+   overall:num('overall'),recommend:num('recommend'),housing_type:p.housing_type,travel:num('travel'),best:p.best||'',improve:p.improve||'',advice:p.advice||'',
+   share_consent:p.share_consent==='yes'?1:0,future_contact:p.future_contact?(p.future_contact==='yes'?1:0):null,followup_id:null};
+  for(const key of finalRequired){row[key]=num(key);row[key+'_comment']=(p[key+'_comment']||'').trim();}
+  const low=finalRequired.filter(key=>row[key]<=2);
+  if(low.length){
+   row.followup_id='follow-'+finalId;
+   mock.feedback.unshift({id:row.followup_id,student_id:'preview',name:'Sample submission',destination:'Demo',kind:'final',week:currentWeek,mood:null,need:'none',topic:'',
+    note:low.map(key=>`${finalTopicList.find(x=>x[0]===key)[1]} ${row[key]}/5: ${row[key+'_comment']}`).join('\n'),priority:'follow',status:'open',created_at:new Date().toISOString()});
+  }
+  mock.finalFeedback=[row,...(mock.finalFeedback||[])];
+  saveDemo(mock);
+ };
+ const draw=(focusName,focusValue)=>{
+  rerender=()=>draw();
+  app.innerHTML=shell(t('Your Go Beyond experience'),`${info.name?t('Hi {name}. ',{name:esc(info.name.split(' ')[0])}):''}${t('Your program has ended: tell us how it went. It takes less than 4 minutes.')}`,`
+   ${preview?`<p class="notice">${t('Sample form. Your answers will appear in the sample workspace on this browser.')}</p>`:''}
+   <div class="progress" aria-hidden="true"><span style="width:${Math.round(step/3*100)}%"></span></div><p class="step-label">${t('Step {n} of 3',{n:step})} · ${t(stepNames.at(step-1))}</p>
+   <form id="final-form" novalidate>${body()}<p class="muted privacy-line">${t('Only the Go Beyond team can read your answers. We use them to support you and to improve our programs.')}</p><p class="error" role="alert"></p>
+   <div class="actions step-actions">${step>1?`<button type="button" class="btn" data-step-back>${t('Back')}</button>`:''}<button type="submit" class="btn primary">${t(step<3?'Next':'Send my feedback')}</button></div></form>`);
+  const form=app.querySelector('#final-form');
+  form.addEventListener('input',event=>{if(event.target.name)answers[event.target.name]=event.target.value;});
+  form.addEventListener('change',event=>{
+   const {name,value}=event.target;
+   if(!name)return;
+   answers[name]=value;
+   if(name==='housing_type'||finalRequired.includes(name))draw(name,value);
+  });
+  form.querySelectorAll('[data-open-comment]').forEach(b=>{b.onclick=()=>{opened.add(b.dataset.openComment);draw();app.querySelector(`textarea[name="${b.dataset.openComment}_comment"]`)?.focus();};});
+  form.querySelector('[data-step-back]')?.addEventListener('click',()=>{step--;draw();window.scrollTo(0,0);});
+  if(focusName)form.querySelector(`input[name="${focusName}"][value="${focusValue}"]`)?.focus();
+  form.onsubmit=async event=>{
+   event.preventDefault();
+   const button=form.querySelector('button[type=submit]');
+   try{
+    validate();
+    if(step<3){step++;draw();window.scrollTo(0,0);return;}
+    button.disabled=true;
+    if(preview)saveDemoFinal(answers);
+    else await request('/api/final/submit',{...answers,token,language:lang});
+    finished(false);
+   }catch(error){showError(form,error);button.disabled=false;}
+  };
+ };
+ draw();
 }
 function setLang(next){
  lang=next;
@@ -1193,6 +1869,7 @@ async function boot(){
  document.title=t('Gobeyond Student Care');
  if(location.pathname==='/'&&location.hash.startsWith('#staff=')){showStaffInvite(location.hash.slice(7));return;}
  if(location.pathname==='/check-in'){await formPage();return;}
+ if(location.pathname==='/final'){await finalPage();return;}
  if(new URLSearchParams(location.search).has('demo')){demo=true;data=readDemo();render();return;}
  rerender=()=>{app.innerHTML=`<main class="formpage"><p>${t('Loading student care workspace…')}</p></main>`;};
  rerender();

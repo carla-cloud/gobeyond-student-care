@@ -684,7 +684,7 @@ async function api(request,env,ctx,url) {
       taken.push({consultant_id:slot.consultant,starts_at:slot.starts,ends_at:slot.ends});
       added++;
     }
-    await audit(db,actor,'recurring availability added','slot',null,`${chosen.join(', ')} · ${blocks.map(b=>b.from+'-'+b.to).join(', ')} · ${weeks} weeks · ${added} added`);
+    await audit(db,actor,'recurring availability added','slot',null,`${chosen.join(', ')} · ${blocks.map(b=>b.from+'-'+b.to).join(', ')} · weeks: ${weeks} · added: ${added}`);
     return json({saved:true,added,skipped},201);
   }
   // Remove the example times created on the first run (open ones only).
