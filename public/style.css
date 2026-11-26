@@ -17,3 +17,137 @@
 .delete-action:hover {
   text-decoration: underline;
 }
+
+/* Final feedback, student page, trends, consultants, recurring availability, activity */
+dialog.wide{width:min(860px,calc(100% - 28px))}
+.check{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer}
+.check input{width:auto;margin:0;accent-color:var(--blue)}
+.field small.muted{font-weight:400}
+.field-row.three{grid-template-columns:repeat(3,1fr)}
+.privacy-line{font-size:13px}
+.phone-field{margin:12px 0 0}
+.later-booking{margin-bottom:16px}
+.student-name{display:block}
+.consultant-btn.inactive{opacity:.65}
+.consultant-btn b .pill{margin-left:6px;vertical-align:1px}
+.consultant-form{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.consultant-form h3,dialog h3{font-size:15px;margin:18px 0 8px}
+.day-picks{display:flex;flex-wrap:wrap;gap:6px}
+.day-picks label{position:relative}
+.day-picks input{position:absolute;opacity:0;width:1px}
+.day-picks span{display:block;min-width:52px;text-align:center;border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px;font-weight:600;cursor:pointer}
+.day-picks input:checked+span{border-color:var(--blue);background:#e9f1ff;color:#134cae}
+.day-picks input:focus-visible+span{outline:3px solid #5e9dff}
+/* Overview trends */
+.trends{margin-top:17px}
+.trends .card-head{flex-wrap:wrap}
+.trend-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:20px;padding:0 19px 19px;align-items:start}
+.trend-body h3{font-size:14px;color:var(--mute);margin-bottom:8px}
+.mood-chart{width:100%;height:auto;display:block}
+.mood-chart .grid{stroke:#edf1f6}
+.mood-chart .line{fill:none;stroke:var(--blue);stroke-width:2.5}
+.mood-chart .dot{fill:white;stroke:var(--blue);stroke-width:2}
+.mood-chart .axis{font-size:12px;fill:var(--mute)}
+table.heat td,table.heat th{text-align:center;padding:8px 6px}
+table.heat td:first-child,table.heat th:first-child{text-align:left}
+.heat-cell{font-weight:800;font-size:13px}
+.heat-cell.level-1{background:#fff6e8;color:#855109}
+.heat-cell.level-2{background:#ffe3bf;color:#7a4a05}
+.heat-cell.level-3{background:#ffc98f;color:#6b3d00}
+/* Student page */
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:14px 0 6px}
+.facts div{background:#f7f9fc;border:1px solid var(--line);border-radius:8px;padding:9px 12px}
+.facts dt{font-size:12px;color:var(--mute);font-weight:700}
+.facts dd{margin:3px 0 0;font-size:14px;overflow-wrap:anywhere}
+.timeline{list-style:none;padding:0;margin:0}
+.timeline li{padding:8px 0;border-top:1px solid var(--line);font-size:14px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+/* Final feedback tab */
+.final-filters{padding:17px 19px}
+.topic-bars{padding:0 19px 19px;display:grid;gap:12px}
+.topic-bar{display:grid;grid-template-columns:minmax(120px,1.2fr) 2fr 36px;gap:10px;align-items:center;font-size:14px}
+.bar-track{height:10px;background:#edf1f6;border-radius:6px;overflow:hidden}
+.bar-fill{display:block;height:100%;background:var(--blue);border-radius:6px}
+.bar-fill.low{background:#d97706}
+.topic-bar b{text-align:right}
+.stars{color:#f5a623;letter-spacing:1px;white-space:nowrap}
+.stars .dim{color:#d9e1ec}
+.pill.promoter{color:#16694e;background:#e5f5ec}
+.pill.passive{color:#245a9e;background:#e9f3ff}
+.pill.detractor{color:#a52c29;background:#ffebea}
+.quotes{padding:0 19px 19px;display:grid;gap:12px}
+.quote{margin:0;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:8px;padding:12px 14px}
+.quote blockquote{margin:0 0 6px;font-size:15px;line-height:1.5}
+.quote figcaption{font-size:13px;color:var(--mute);margin:6px 0}
+.final-score{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.final-score div{background:#f7f9fc;border:1px solid var(--line);border-radius:8px;padding:10px 12px;text-align:center}
+.final-score b{display:block;font-family:Manrope,sans-serif;font-size:17px}
+.final-score small{color:var(--mute);font-size:12px}
+.final-topics li span:first-child small{display:block;color:var(--mute);font-size:13px;margin-top:3px;white-space:pre-wrap}
+/* Student final form */
+.progress{height:6px;background:#edf1f6;border-radius:6px;overflow:hidden;margin-bottom:8px}
+.progress span{display:block;height:100%;background:var(--blue);border-radius:6px;transition:width .2s}
+.step-label{font-size:13px;font-weight:700;color:var(--mute);margin-bottom:16px}
+.scale5{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.scale5 label,.nps label{position:relative}
+.scale5 input,.nps input{position:absolute;opacity:0;width:1px}
+.scale5 span{display:block;text-align:center;border:1px solid var(--line);border-radius:8px;padding:8px 3px;cursor:pointer}
+.scale5 span b{display:block;font-size:18px;font-family:Manrope,sans-serif}
+.scale5 span small{display:block;font-size:11.5px;color:var(--mute)}
+.scale5 input:checked+span,.nps input:checked+span{border-color:var(--blue);background:#e9f1ff;color:#134cae}
+.scale5 input:checked+span small{color:#134cae}
+.scale5 input:focus-visible+span,.nps input:focus-visible+span{outline:3px solid #5e9dff}
+.nps{display:grid;grid-template-columns:repeat(11,1fr);gap:4px}
+.nps span{display:block;text-align:center;border:1px solid var(--line);border-radius:8px;padding:9px 0;font-weight:700;cursor:pointer}
+.nps-ends{display:flex;justify-content:space-between;font-size:12px;color:var(--mute);margin-top:6px;font-weight:400}
+.final-topic{border:0;border-top:1px solid var(--line);padding:14px 0 4px;margin:0}
+.final-topic legend{font-weight:700;font-size:15px;padding:0;margin-bottom:8px;float:left;width:100%}
+.final-topic .scale5{clear:both}
+.add-comment{margin:8px 0 6px;font-size:13px}
+.comment-field{margin:10px 0 6px}
+.yes-no{grid-template-columns:1fr 1fr}
+.housing-options{grid-template-columns:repeat(3,1fr)}
+.housing-options,.yes-no{display:grid}
+.rate-hint{margin-top:-4px}
+.step-actions{justify-content:space-between;margin-top:8px}
+@media(max-width:1200px){.trend-body{grid-template-columns:1fr}}
+@media(max-width:700px){.field-row.three,.housing-options,.final-score{grid-template-columns:1fr}.nps{grid-template-columns:repeat(6,1fr)}.scale5 span small{font-size:10px}.topic-bar{grid-template-columns:1fr 1fr 32px}}
+
+/* Student details: passport, visa, host family / residence, school, emergency contacts, documents */
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:18px 0 8px}
+.section-head h3,dialog .section-head h3{margin:0}
+.add-menu summary{list-style:none;cursor:pointer}
+.add-menu summary::-webkit-details-marker{display:none}
+.add-menu[open] summary{background:#114dc0}
+.add-options{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;max-width:560px}
+.section-head .add-menu[open]{flex-basis:100%;display:flex;flex-direction:column;align-items:flex-end}
+.add-option{display:inline-flex;align-items:center;gap:6px;border:1px solid #d9e3f0;background:white;border-radius:20px;padding:7px 12px;font-size:13px;font-weight:700;color:#25364e}
+.add-option:hover{border-color:var(--blue);background:#edf4ff;color:var(--blue)}
+.detail-adder{margin:4px 0 8px;padding-top:4px;border-top:1px solid var(--line)}
+.detail-adder>.muted{margin:0 0 12px}
+.detail-section{position:relative;border:1px solid var(--line);border-radius:10px;padding:10px 14px 0;margin:0 0 12px;min-width:0}
+.detail-section legend{font-family:Manrope,sans-serif;font-weight:800;font-size:14px;padding:0 6px}
+.section-remove{position:absolute;top:-11px;right:12px;font-size:13px;background:white;padding:0 6px}
+.detail-fields{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.detail-fields .detail-wide{grid-column:1/-1}
+.detail-fields textarea{min-height:60px}
+.detail-fields p.detail-wide{margin:-6px 0 8px}
+.detail-fields label.check{margin-bottom:16px}
+.detail-list{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+.detail-item{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.5}
+.detail-item>div:first-child{min-width:0;overflow-wrap:anywhere}
+.detail-item .detail-kind{margin-right:6px;font-family:Manrope,sans-serif}
+.detail-item small{display:block;margin-top:3px;white-space:pre-wrap}
+.detail-item a{color:var(--blue);font-weight:700}
+.detail-item .file-link{display:inline-block;margin-top:4px}
+.detail-item .actions{flex-shrink:0}
+.missing{color:#855109;background:#fff6e8;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;margin:0 0 10px}
+@media(max-width:700px){.detail-fields{grid-template-columns:1fr}.detail-item{flex-direction:column}}
+/* Students tab: details open under the student's row */
+tr.row-open>td{background:#f7faff}
+tr.details-row>td{padding:0 19px 18px;background:#f7faff;white-space:normal}
+.details-panel{background:white;border:1px solid var(--line);border-radius:10px;padding:2px 16px 14px}
+.details-panel .section-head{margin-top:12px}
+.details-panel h3{font-size:15px}
+.details-toggle{color:var(--blue)}
+.details-cell{background:none;padding:0;text-align:left;color:inherit;cursor:pointer;border-radius:6px}
+.details-cell:hover .pill{box-shadow:0 0 0 1px #9fc0f5}
