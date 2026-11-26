@@ -151,3 +151,7 @@ tr.details-row>td{padding:0 19px 18px;background:#f7faff;white-space:normal}
 .details-toggle{color:var(--blue)}
 .details-cell{background:none;padding:0;text-align:left;color:inherit;cursor:pointer;border-radius:6px}
 .details-cell:hover .pill{box-shadow:0 0 0 1px #9fc0f5}
+.schedule-row{border:0;border-top:1px solid var(--line);margin:18px 0 4px;padding:7px 0 0;min-width:0}
+.schedule-row legend{padding:0 8px 0 0;font:700 1rem Manrope,sans-serif}
+.schedule-row .field-row{max-width:490px;margin-top:10px}
+#email-schedule-status:empty,#email-schedule .error:empty{display:none}

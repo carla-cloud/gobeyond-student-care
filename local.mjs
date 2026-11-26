@@ -19,6 +19,10 @@ for (const file of ['0004_checkin_areas.sql','0005_consultant_calendar.sql',
 if (!db.prepare("SELECT name FROM pragma_table_info('students') WHERE name='anonymized_at'").get()) {
  db.exec(await readFile('drizzle/0009_student_and_calendar_fields.sql','utf8'));
 }
+db.exec(await readFile('drizzle/0010_survey_email_schedule.sql','utf8'));
+if (!db.prepare("SELECT name FROM pragma_table_info('students') WHERE name='end_period'").get()) {
+ db.exec(await readFile('drizzle/0011_student_end_period.sql','utf8'));
+}
 const DB={
  prepare(sql){return {bind(...args){return {
   async first(){return db.prepare(sql).get(...args)??null;},

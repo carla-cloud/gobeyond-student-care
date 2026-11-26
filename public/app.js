@@ -146,9 +146,22 @@ const IT={
  // Settings
  'Manage weekly delivery and spreadsheet syncing.':'Gestisci l’invio settimanale e la sincronizzazione del foglio di calcolo.',
  'Weekly reminders':'Promemoria settimanali',
- 'The email automation checks daily for active students. Each student who has yet to check in gets one email per week, and a reminder four days later if they still haven’t replied. Their personal link opens without an account.':'L’automazione email controlla ogni giorno gli studenti attivi. Ogni studente che non ha ancora fatto il check-in riceve un’email a settimana e, se dopo quattro giorni non ha ancora risposto, un promemoria. Il suo link personale si apre senza account.',
- 'Active students who have yet to check in get one email per week, and a reminder four days later if they still haven’t replied.':'Gli studenti attivi che non hanno ancora fatto il check-in ricevono un’email a settimana e, se dopo quattro giorni non hanno ancora risposto, un promemoria.',
- 'Daily check scheduled':'Controllo giornaliero programmato',
+ 'Email schedule':'Programmazione delle email',
+ 'Scheduled delivery is enabled':'Invio programmato attivo',
+ 'All times use Madrid time.':'Gli orari sono quelli di Madrid.',
+ 'Any day':'Qualsiasi giorno',
+ 'Program end date':'Data di fine programma',
+ 'Monday':'Lunedì',
+ 'Tuesday':'Martedì',
+ 'Wednesday':'Mercoledì',
+ 'Thursday':'Giovedì',
+ 'Friday':'Venerdì',
+ 'Saturday':'Sabato',
+ 'Sunday':'Domenica',
+ 'Active students who haven’t checked in get one email per week. A reminder follows four days later if they still haven’t replied. Their personal link opens without an account.':'Gli studenti attivi che non hanno fatto il check-in ricevono un’email a settimana. Se non rispondono entro quattro giorni, ricevono un promemoria. Il link personale si apre senza account.',
+ 'The final form is sent once, on the program end date or the first selected weekday on or after it. It stays open for 30 days after the end date.':'Il modulo finale viene inviato una sola volta, alla fine del programma o nel primo giorno della settimana selezionato a partire da quella data. Resta aperto per 30 giorni dopo la fine del programma.',
+ 'Save email schedule':'Salva la programmazione delle email',
+ 'Email schedule saved.':'Programmazione delle email salvata.',
  'Webhook configured':'Webhook configurato',
  'Connection required':'Connessione richiesta',
  'Spreadsheet sync':'Sincronizzazione del foglio di calcolo',
@@ -183,6 +196,14 @@ const IT={
  'Full name':'Nome e cognome',
  'Program start':'Inizio del programma',
  'Program end':'Fine del programma',
+ 'Program end period':'Periodo di fine programma',
+ 'Custom date':'Data personalizzata',
+ 'First week of December (1–7)':'Prima settimana di dicembre (1–7)',
+ 'Last week of May (25–31)':'Ultima settimana di maggio (25–31)',
+ 'Select an exact date within the chosen week.':'Seleziona una data precisa nella settimana scelta.',
+ 'Choose an end date in the selected week.':'Scegli una data di fine nella settimana selezionata.',
+ 'Choose an end date from December 1 to 7.':'Scegli una data di fine dal 1° al 7 dicembre.',
+ 'Choose an end date from May 25 to 31.':'Scegli una data di fine dal 25 al 31 maggio.',
  'Choose an end date on or after the start date.':'Scegli una data di fine uguale o successiva alla data di inizio.',
  'This student email already exists.':'Esiste già uno studente con questa email.',
  'Open the live workspace to run connected jobs.':'Apri l’area di lavoro reale per eseguire le attività collegate.',
@@ -362,6 +383,7 @@ const IT={
  'Invited':'Invitati',
  'Students sent the form':'Studenti a cui è stato inviato il modulo',
  'Responses received':'Risposte ricevute',
+ 'Submitted final forms':'Moduli finali compilati',
  'No invitations yet':'Ancora nessun invito',
  'Overall rating':'Valutazione complessiva',
  'Average out of 5':'Media su 5',
@@ -402,7 +424,8 @@ const IT={
  'Received on {date}':'Ricevuto il {date}',
  'Sent, waiting for an answer':'Inviato, in attesa di risposta',
  'Not sent yet':'Non ancora inviato',
- 'The form opens 3 days before the end of the program and closes 30 days after it. The invitation is sent automatically on the end date, with reminders after 4 and 10 days.':'Il modulo si apre 3 giorni prima della fine del programma e si chiude 30 giorni dopo. L’invito parte automaticamente il giorno di fine, con promemoria dopo 4 e 10 giorni.',
+ 'Invitation status is in Gmail Sent.':'Lo stato dell’invito si può verificare nella Posta inviata di Gmail.',
+ 'The form opens 3 days before the end of the program and closes 30 days after it.':'Il modulo si apre 3 giorni prima della fine del programma e si chiude 30 giorni dopo.',
  'Final feedback link':'Link del feedback finale',
  'Send the form by email now':'Invia ora il modulo via email',
  'Copy link':'Copia link',
@@ -1068,6 +1091,24 @@ function availabilityDialog(){
   }catch(error){showError(form,error);}
  };
 }
+function emailScheduleForm(){
+ const schedule={weekly_day:'any',weekly_hour:9,final_day:'end',final_hour:9,...data.emailSchedule};
+ const weekdays=[['mon','Monday'],['tue','Tuesday'],['wed','Wednesday'],['thu','Thursday'],['fri','Friday'],['sat','Saturday'],['sun','Sunday']];
+ const row=(key,heading,defaultDay,defaultLabel,description)=>`<fieldset class="schedule-row">
+   <legend>${t(heading)}</legend>
+   <p class="sub">${t(description)}</p>
+   <div class="field-row">
+    <label class="field">${t('Day')}<select name="${key}_day">${[[defaultDay,defaultLabel],...weekdays].map(([day,label])=>`<option value="${day}" ${schedule[key+'_day']===day?'selected':''}>${t(label)}</option>`).join('')}</select></label>
+    <label class="field">${t('Time')}<select name="${key}_hour">${Array.from({length:24},(_,hour)=>`<option value="${hour}" ${schedule[key+'_hour']===hour?'selected':''}>${String(hour).padStart(2,'0')}:00</option>`).join('')}</select></label>
+   </div>
+  </fieldset>`;
+ return `<form id="email-schedule">
+  ${row('weekly','Weekly reminders','any','Any day','Active students who haven’t checked in get one email per week. A reminder follows four days later if they still haven’t replied. Their personal link opens without an account.')}
+  ${row('final','Final feedback','end','Program end date','The final form is sent once, on the program end date or the first selected weekday on or after it. It stays open for 30 days after the end date.')}
+  <div class="actions"><button class="btn primary">${t('Save email schedule')}</button></div>
+  <p class="error" role="alert"></p><p class="footnote" id="email-schedule-status" role="status"></p>
+ </form>`;
+}
 function dataView(expandDeleted=false){
  if(view==='overview') return overview();
  if(view==='calendar') return calendarView();
@@ -1087,22 +1128,18 @@ function dataView(expandDeleted=false){
  if(view==='settings'){
   const staffSignOut=data.staffSession?btn('Sign out','sign-out'):'';
   const {reminderScheduled,reminder,sheet}=data.integrations;
-  const reminderCopy=reminderScheduled
-   ? 'The email automation checks daily for active students. Each student who has yet to check in gets one email per week, and a reminder four days later if they still haven’t replied. Their personal link opens without an account.'
-   : 'Active students who have yet to check in get one email per week, and a reminder four days later if they still haven’t replied.';
-  const reminderStatus=reminderScheduled?'Daily check scheduled':reminder?'Webhook configured':'Connection required';
+  const reminderStatus=reminderScheduled?'Scheduled delivery is enabled':reminder?'Webhook configured':'Connection required';
   const sheetAction=externalSheetLink()||`<span class="pill">${t(sheet?'Webhook configured':'Connection required')}</span>`;
   return title('Settings','Manage weekly delivery and spreadsheet syncing.',staffSignOut)+`
    <section class="card formbody">
-     <h2>${t('Weekly reminders')}</h2>
-     <p class="sub">${t(reminderCopy)}</p>
+     <h2>${t('Email schedule')}</h2>
+     <p class="sub">${t('All times use Madrid time.')}</p>
      <p class="footnote"><span class="pill">${t(reminderStatus)}</span></p>
+     ${emailScheduleForm()}
      <br><h2>${t('Spreadsheet sync')}</h2>
      <p class="sub">${t('Each check-in or message appears immediately in the CRM spreadsheet.')}</p>
      <div class="actions" style="margin:14px 0">${sheetAction}</div>
      ${sheet||reminder?`${btn('Run connected jobs','jobs','clock',true)}<p class="footnote" id="page-status" role="status"></p>`:''}
-     <br><h2>${t('Final feedback')}</h2>
-     <p class="sub">${t('The final feedback form is sent automatically on each student’s end date, with reminders after 4 and 10 days. It stays open for 30 days.')}</p>
      <br><h2>${t('Privacy')}</h2>
      <p class="sub">${data.integrations.retentionMonths
       ?t('Personal details and written answers are removed {n} months after a program ends. Ratings are kept for statistics.',{n:data.integrations.retentionMonths})
@@ -1147,6 +1184,26 @@ function render(expandDeleted=false){
  bind('#final-dest',el=>{finalDest=el.value;});
  bind('#final-month',el=>{finalMonth=el.value;});
  bind('#final-quotes',el=>{finalQuotes=el.checked;});
+ const emailSchedule=document.querySelector('#email-schedule');
+ if(emailSchedule)emailSchedule.onsubmit=saveEmailSchedule;
+}
+async function saveEmailSchedule(event){
+ event.preventDefault();
+ const form=event.currentTarget;
+ const button=form.querySelector('button');
+ const status=form.querySelector('#email-schedule-status');
+ const values=Object.fromEntries(new FormData(form));
+ const schedule={...values,weekly_hour:Number(values.weekly_hour),final_hour:Number(values.final_hour)};
+ button.disabled=true;
+ status.textContent='';
+ form.querySelector('.error').textContent='';
+ try{
+  if(!demo)await request('/api/email-schedule',schedule);
+  data.emailSchedule=schedule;
+  if(demo)saveDemo(data);
+  status.textContent=t('Email schedule saved.');
+ }catch(error){showError(form,error);}
+ finally{button.disabled=false;}
 }
 function openDialog(title,body,wide=false){
  detail.classList.toggle('wide',wide);
@@ -1434,20 +1491,53 @@ function removeDetailDialog(s,item){
   }catch(error){showError(form,error);}
  };
 }
+const programEndPeriods={
+ 'custom':{label:'Custom date'},
+ 'december-first-week':{label:'First week of December (1–7)',from:'12-01',to:'12-07',error:'Choose an end date from December 1 to 7.'},
+ 'may-last-week':{label:'Last week of May (25–31)',from:'05-25',to:'05-31',error:'Choose an end date from May 25 to 31.'}
+};
+function dateMatchesEndPeriod(date,period){
+ const monthDay=date.slice(5);
+ return date.length===10&&monthDay>=period.from&&monthDay<=period.to;
+}
+function suggestProgramEnd(date,period,earliest,preferredYear){
+ if(dateMatchesEndPeriod(date,period)&&date>=earliest)return date;
+ const preferred=preferredYear+'-'+period.to;
+ if(preferredYear&&preferred>=earliest)return preferred;
+ const year=earliest.slice(0,4);
+ const next=year+'-'+period.to;
+ return next>=earliest?next:(Number(year)+1)+'-'+period.to;
+}
 function addDialog(student){
  // New students: "Add" offers passport, visa, family, school, emergency contact and document sections.
  const adder=student?'':`<div class="detail-adder"><div class="section-head"><h3>${t('Passport, visa, family, school, contacts and documents (optional)')}</h3>${addMenu('data-add-section')}</div>
   <p class="muted" data-adder-hint>${t('Press Add to include a passport, visa, host family, school, emergency contact or document.')}</p><div data-sections></div></div>`;
- openDialog(t(student?'Edit student':'Add a student'),`<form>${textField('Full name','name','text','maxlength="100"')}${textField('Email','email','email','maxlength="254"')}${textField('Destination','destination','text','maxlength="120"')}<div class="field-row">${textField('Program start','start_date','date')}${textField('Program end','end_date','date')}</div>
+ openDialog(t(student?'Edit student':'Add a student'),`<form>${textField('Full name','name','text','maxlength="100"')}${textField('Email','email','email','maxlength="254"')}${textField('Destination','destination','text','maxlength="120"')}<div class="field-row">${textField('Program start','start_date','date')}
+  <label class="field">${t('Program end period')}<select name="end_period">${Object.entries(programEndPeriods).map(([value,period])=>`<option value="${value}">${t(period.label)}</option>`).join('')}</select></label></div>
+  <label class="field">${t('Program end date')}<input name="end_date" type="date" required aria-describedby="end-period-hint"><small class="muted" id="end-period-hint" hidden>${t('Select an exact date within the chosen week.')}</small></label>
   <div class="field-row"><label class="field">${t('Phone or WhatsApp (optional)')}<input name="phone" type="tel" maxlength="25" autocomplete="off"></label>
   <label class="field">${t('Email language')}<select name="language"><option value="">${t('Automatic (Italian until the student chooses)')}</option><option value="it">Italiano</option><option value="en">English</option></select></label></div>
   <label class="field">${t('Parent email for emergencies (optional)')}<input name="parent_email" type="email" maxlength="254"><small class="muted">${t('Never used for check-ins or the final feedback form.')}</small></label>
   ${adder}<p class="error" role="alert"></p><button type="submit" class="btn primary">${t(student?'Save changes':'Add student')}</button></form>`,!student);
  const form=detail.querySelector('form');
- const base=['name','email','destination','start_date','end_date','phone','parent_email','language'];
+ const base=['name','email','destination','start_date','end_period','end_date','phone','parent_email','language'];
  if(student){
   for(const name of base)form.elements[name].value=student[name]??'';
  }
+ const {start_date:start,end_period:endPeriod,end_date:end}=form.elements;
+ if(!Object.hasOwn(programEndPeriods,endPeriod.value))endPeriod.value='custom';
+ const endHint=form.querySelector('#end-period-hint');
+ endHint.hidden=endPeriod.value==='custom';
+ function updateProgramEnd(){
+  const period=programEndPeriods[endPeriod.value];
+  endHint.hidden=!period.to;
+  if(!period.to)return;
+  const earliest=start.value||student?.start_date||day;
+  const preferredYear=student?(end.value||student.end_date).slice(0,4):'';
+  end.value=suggestProgramEnd(end.value,period,earliest,preferredYear);
+ }
+ start.addEventListener('change',updateProgramEnd);
+ endPeriod.addEventListener('change',updateProgramEnd);
  let sections=0;
  const hint=()=>{const el=form.querySelector('[data-adder-hint]');if(el)el.hidden=!!form.querySelector('.detail-section');};
  form.querySelectorAll('[data-add-section]').forEach(option=>{option.onclick=()=>{
@@ -1471,6 +1561,8 @@ function addDialog(student){
   const fields=Object.fromEntries(base.map(name=>[name,form.elements[name].value]));
   try{
    if(fields.start_date>fields.end_date)throw new Error('Choose an end date on or after the start date.');
+   const period=programEndPeriods[fields.end_period];
+   if(period.to&&!dateMatchesEndPeriod(fields.end_date,period))throw new Error(period.error);
    const items=[];
    for(const box of form.querySelectorAll('.detail-section'))items.push(await readDetail(form,box.dataset.kind,box.dataset.prefix));
    if(demo){
@@ -1992,8 +2084,10 @@ const npsLabel=n=>t(npsGroup(n)==='promoter'?'Promoter':npsGroup(n)==='passive'?
 const npsScore=rows=>rows.length?Math.round((rows.filter(r=>r.recommend>=9).length-rows.filter(r=>r.recommend<=6).length)/rows.length*100):null;
 const lowTopics=r=>finalRequired.filter(k=>r[k]!=null&&r[k]<=2);
 const finalLink=s=>location.origin+'/final#'+s.token;
+const gmailInvitationStatus=()=>!demo&&data.integrations.reminderScheduled&&!data.integrations.reminder;
 let finalDest='all',finalMonth='all',finalQuotes=false;
 function finalView(){
+ const gmailInvitations=gmailInvitationStatus();
  const rows=data.finalFeedback||[];
  const people=new Map(data.students.map(s=>[s.id,s]));
  for(const r of rows)if(!people.has(r.student_id))people.set(r.student_id,{id:r.student_id,destination:r.destination,end_date:r.end_date});
@@ -2018,8 +2112,8 @@ function finalView(){
    <select id="final-month" aria-label="${t('Program end')}" style="width:auto"><option value="all">${t('All end months')}</option>${months.map(m=>`<option value="${m}" ${m===finalMonth?'selected':''}>${monthName(m)}</option>`).join('')}</select>
    <label class="check"><input type="checkbox" id="final-quotes" ${finalQuotes?'checked':''}> ${t('Testimonials only')}</label></div></section>
   <section class="metrics" aria-label="${t('Final feedback summary')}">
-   ${metric('Invited',invited,t('Students sent the form'),'final')}
-   ${metric('Responses received',responses.length,rate==null?t('No invitations yet'):t('{rate}% response rate',{rate}),'feedback','green')}
+   ${metric('Invited',gmailInvitations?'—':invited,t(gmailInvitations?'Invitation status is in Gmail Sent.':'Students sent the form'),'final')}
+   ${metric('Responses received',responses.length,gmailInvitations?t('Submitted final forms'):rate==null?t('No invitations yet'):t('{rate}% response rate',{rate}),'feedback','green')}
    ${metric('Overall rating',oneDecimal(average(responses.map(r=>r.overall))),t('Average out of 5'),'final','purple')}
    ${metric('Recommendation score',nps==null?'—':(nps>0?'+':'')+nps,t('NPS: % 9–10 minus % 0–6'),'students','orange')}
   </section>
@@ -2043,9 +2137,9 @@ function finalDialog(r){
 function finalStudentDialog(s){
  const answer=(data.finalFeedback||[]).find(r=>r.student_id===s.id);
  const invited=(data.finalInvited||[]).includes(s.id);
- const status=answer?t('Received on {date}',{date:dateLabel(answer.submitted_at)}):invited?t('Sent, waiting for an answer'):t('Not sent yet');
+ const status=answer?t('Received on {date}',{date:dateLabel(answer.submitted_at)}):t(invited?'Sent, waiting for an answer':gmailInvitationStatus()?'Invitation status is in Gmail Sent.':'Not sent yet');
  openDialog(t('Final feedback form'),`<p class="sub">${esc(s.name)} · ${t('Program end')} ${dateLabel(s.end_date)}</p><p class="footnote"><span class="pill ${answer?'resolved':''}">${status}</span></p><br>
-  <p class="muted">${t('The form opens 3 days before the end of the program and closes 30 days after it. The invitation is sent automatically on the end date, with reminders after 4 and 10 days.')}</p><br>
+  <p class="muted">${t('The form opens 3 days before the end of the program and closes 30 days after it.')}</p><br>
   ${s.token?`<label class="field">${t('Final feedback link')}<input readonly value="${esc(finalLink(s))}"></label>`:`<p class="muted">${t('Sample student')}</p>`}
   <form><p class="error" role="alert"></p><div class="actions">${(answer||!s.token||!data.integrations?.reminder)?'':`<button class="btn primary">${t('Send the form by email now')}</button>`}${s.token?`<button type="button" class="btn" data-copy-final>${t('Copy link')}</button>`:''}${answer?`<button type="button" class="btn" data-view-final>${t('View answers')}</button>`:''}</div><p class="footnote" role="status" id="final-send-status"></p></form>`);
  const form=detail.querySelector('form');

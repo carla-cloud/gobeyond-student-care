@@ -21,7 +21,11 @@ const text = value => typeof value === 'string' ? value.trim() : '';
 const headers = {'cache-control':'no-store','referrer-policy':'no-referrer','x-content-type-options':'nosniff'};
 const json = (body,status=200) => Response.json(body,{status,headers});
 const fail = (error,status=400) => json({error},status);
-const rosterSql = 'SELECT id,name,email,destination,start_date,end_date,token,phone,parent_email,language FROM students WHERE deleted_at IS NULL ORDER BY name';
+const rosterSql = 'SELECT id,name,email,destination,start_date,end_date,end_period,token,phone,parent_email,language FROM students WHERE deleted_at IS NULL ORDER BY name';
+const programEndWeeks = [
+  ['december-first-week','12-01','12-07'],
+  ['may-last-week','05-25','05-31']
+];
 const validPhone = value => /^[+()\d\s.-]{6,25}$/.test(value) && (value.match(/\d/g)||[]).length>=6;
 const validEmail = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const studentLanguage = value => ['it','en'].includes(value) ? value : null;
@@ -31,6 +35,12 @@ const rowsSql=feedbackWithStudent+' WHERE f.deleted_at IS NULL AND s.deleted_at 
 const all = async (db,sql,...args) => (await db.prepare(sql).bind(...args).all()).results;
 const first = (db,sql,...args) => db.prepare(sql).bind(...args).first();
 const run = (db,sql,...args) => db.prepare(sql).bind(...args).run();
+const sendWeekdays = ['sun','mon','tue','wed','thu','fri','sat'];
+const weekdayIndex = date => new Date(date+'T12:00:00Z').getUTCDay();
+const madridHour = new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Madrid',hour:'numeric',hourCycle:'h23'});
+const emailSchedule = db => first(db,'SELECT weekly_day,weekly_hour,final_day,final_hour FROM survey_email_schedule WHERE id=1');
+const validSendHour = value => Number.isInteger(value) && value>=0 && value<=23;
+const firstFinalDay = (end,day) => day==='end' ? end : shiftDay(end,(sendWeekdays.indexOf(day)-weekdayIndex(end)+7)%7);
 function italianTime(date,time) {
   const [y,m,d]=date.split('-').map(Number), [h,mi]=time.split(':').map(Number);
   const wanted=Date.UTC(y,m-1,d,h,mi);
@@ -365,7 +375,7 @@ async function api(request,env,ctx,url) {
   const method=request.method;
   const db=env.DB;
   const sheet=sheetDestination(env);
-  const day=today(), week=weekOf(day);
+  const instant=new Date(), day=madridDay(instant), week=weekOf(day);
   const email=request.headers.get('oai-authenticated-user-email')?.toLowerCase();
   const allow=String(env.STAFF_EMAILS||'').toLowerCase().split(',').map(s=>s.trim()).filter(Boolean);
   const signedIn=Boolean(request.headers.get('oai-authenticated-user-id'));
@@ -525,30 +535,38 @@ async function api(request,env,ctx,url) {
       }
     }
     const origin=url.origin;
-    const eligible=await all(db,`SELECT s.* FROM students s WHERE s.deleted_at IS NULL AND start_date<=? AND end_date>=?
+    const mailer=mailerFor(env);
+    const schedule=mailer ? await emailSchedule(db) : null;
+    const hour=Number(madridHour.format(instant));
+    const weeklyHour=schedule?.weekly_hour===hour;
+    const weeklyDay=schedule?.weekly_day==='any'||schedule?.weekly_day===sendWeekdays[weekdayIndex(day)];
+    const eligible=weeklyHour&&weeklyDay ? await all(db,`SELECT s.* FROM students s WHERE s.deleted_at IS NULL AND start_date<=? AND end_date>=?
       AND NOT EXISTS(SELECT 1 FROM feedback f WHERE f.student_id=s.id AND f.kind='check-in' AND f.week=? AND f.deleted_at IS NULL)
-      AND NOT EXISTS(SELECT 1 FROM delivery d WHERE d.id='reminder:'||s.id||':'||? AND d.state='sent') LIMIT 25`,day,day,week,week);
+      AND NOT EXISTS(SELECT 1 FROM delivery d WHERE d.id='reminder:'||s.id||':'||? AND d.state='sent') LIMIT 25`,day,day,week,week) : [];
     // Second email: the first one for this week went out at least 4 calendar days ago (Madrid time)
     // and the student still has not checked in. Sent at most once per student per week.
     const followUpBefore=shiftDay(day,-reminderFollowUpDays);
-    const followUps=(await all(db,`SELECT s.*,d.updated_at AS first_sent FROM students s
+    const followUps=weeklyHour ? (await all(db,`SELECT s.*,d.updated_at AS first_sent FROM students s
       JOIN delivery d ON d.id='reminder:'||s.id||':'||? AND d.state='sent'
       WHERE s.deleted_at IS NULL AND s.start_date<=? AND s.end_date>=?
       AND NOT EXISTS(SELECT 1 FROM feedback f WHERE f.student_id=s.id AND f.kind='check-in' AND f.week=? AND f.deleted_at IS NULL)
       AND NOT EXISTS(SELECT 1 FROM delivery r WHERE r.id='reminder-2:'||s.id||':'||? AND r.state='sent')`,week,day,day,week,week))
-      .filter(s=>madridDay(new Date(s.first_sent))<=followUpBefore).slice(0,25);
+      .filter(s=>madridDay(new Date(s.first_sent))<=followUpBefore).slice(0,25) : [];
     const pending=await all(db,`${feedbackWithStudent}
       WHERE f.deleted_at IS NULL AND s.deleted_at IS NULL AND f.kind IN ('check-in','message')
       AND NOT EXISTS(SELECT 1 FROM delivery d WHERE d.id='feedback:'||f.id AND d.state='sent') ORDER BY f.created_at LIMIT 25`);
-    // Final feedback emails: the invitation on the end date, then reminders 4 and 10 days later, each only after
-    // the previous one went out (so a late start never sends them all at once), and none once the student answers.
-    const finished=await all(db,`SELECT s.id,s.name,s.email,s.token,s.end_date,s.language FROM students s
+    // Final feedback is due on the end date or the next selected weekday. Follow-ups use the
+    // final hour and are measured from confirmed deliveries.
+    const finalHour=schedule?.final_hour===hour;
+    const finished=finalHour ? await all(db,`SELECT s.id,s.name,s.email,s.token,s.end_date,s.language FROM students s
       WHERE s.deleted_at IS NULL AND s.anonymized_at IS NULL AND s.end_date<=? AND s.end_date>=?
-      AND NOT EXISTS(SELECT 1 FROM final_feedback ff WHERE ff.student_id=s.id AND ff.deleted_at IS NULL)`,day,shiftDay(day,-finalClosesAfter));
-    const finalSent=new Map((await all(db,"SELECT id,updated_at FROM delivery WHERE id LIKE 'final:%' AND state='sent'")).map(d=>[d.id,d.updated_at]));
+      AND NOT EXISTS(SELECT 1 FROM final_feedback ff WHERE ff.student_id=s.id AND ff.deleted_at IS NULL)`,day,shiftDay(day,-finalClosesAfter)) : [];
+    const finalSent=new Map((finished.length ? await all(db,"SELECT id,updated_at FROM delivery WHERE id LIKE 'final:%' AND state='sent'") : []).map(d=>[d.id,d.updated_at]));
     const finalDue=finished.flatMap(s=>{
       const next=[1,2,3].find(n=>!finalSent.has('final:'+s.id+':'+n));
-      if (!next || day<shiftDay(s.end_date,finalEmailDays.at(next-1))) return [];
+      if (!next) return [];
+      if (next===1 && (day<firstFinalDay(s.end_date,schedule.final_day)||
+        (schedule.final_day!=='end'&&schedule.final_day!==sendWeekdays[weekdayIndex(day)]))) return [];
       if (next>1) {
         const previous=finalSent.get('final:'+s.id+':'+(next-1));
         if (madridDay(new Date(previous))>shiftDay(day,-(finalEmailDays.at(next-1)-finalEmailDays.at(next-2)))) return [];
@@ -572,7 +590,7 @@ async function api(request,env,ctx,url) {
     };
     const outcomes=[];
     for(const [destination,events] of [
-      [env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET?{url:env.REMINDER_WEBHOOK_URL,secret:env.WEBHOOK_SECRET}:null,
+      [mailer,
         [...eligible.map(s=>reminder(s,1)),...followUps.map(s=>reminder(s,2)),...finalDue]],
       [sheet,[...pending.map(feedbackEvent),...pendingFinal.map(record=>({id:'final-feedback:'+record.id,kind:'final-feedback',record}))]]
     ]) {
@@ -584,15 +602,26 @@ async function api(request,env,ctx,url) {
   }
   if (!staff) return fail(signedIn ? 'Staff access is required.' : 'Sign in to open the staff workspace.',signedIn ? 403 : 401);
 
+  if (path==='/api/email-schedule' && method==='POST') {
+    const input=await request.json();
+    const {weekly_day,weekly_hour,final_day,final_hour}=input||{};
+    if ((weekly_day!=='any'&&!sendWeekdays.includes(weekly_day))||(final_day!=='end'&&!sendWeekdays.includes(final_day))||
+      !validSendHour(weekly_hour)||!validSendHour(final_hour)) return fail('Choose a valid day and hour for each survey.');
+    await run(db,`INSERT INTO survey_email_schedule (id,weekly_day,weekly_hour,final_day,final_hour) VALUES (1,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET weekly_day=excluded.weekly_day,weekly_hour=excluded.weekly_hour,
+      final_day=excluded.final_day,final_hour=excluded.final_hour`,weekly_day,weekly_hour,final_day,final_hour);
+    return json({saved:true,emailSchedule:{weekly_day,weekly_hour,final_day,final_hour}});
+  }
   if (path==='/api/data' && method==='GET') {
-    const [students,feedback,deletedStudents,deletedFeedback,slots,consultantRows,finalFeedback,finalDeliveries]=await Promise.all([
+    const [students,feedback,deletedStudents,deletedFeedback,slots,consultantRows,finalFeedback,finalDeliveries,surveySchedule]=await Promise.all([
       all(db,rosterSql),all(db,rowsSql),
       all(db,'SELECT id,name,email,destination,start_date,end_date,deleted_at FROM students WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC'),
       all(db,feedbackWithStudent+' WHERE f.deleted_at IS NOT NULL AND s.deleted_at IS NULL ORDER BY f.deleted_at DESC'),
       all(db,calendarRowsSql,new Date(Date.now()-2*86400000).toISOString()),
       all(db,'SELECT id,name,phone,email,active FROM consultants ORDER BY rowid'),
       all(db,finalRowsSql+' WHERE ff.deleted_at IS NULL AND s.deleted_at IS NULL ORDER BY ff.submitted_at DESC'),
-      all(db,"SELECT id FROM delivery WHERE id LIKE 'final:%' AND state='sent'")
+      all(db,"SELECT id FROM delivery WHERE id LIKE 'final:%' AND state='sent'"),
+      emailSchedule(db)
     ]);
     const activity=await all(db,'SELECT at,actor,action,object_type,object_id,details FROM audit_log ORDER BY at DESC LIMIT 60');
     // Details without file contents (files are downloaded one at a time from /api/items/file).
@@ -602,7 +631,7 @@ async function api(request,env,ctx,url) {
     const sheetUrl = typeof env.GOOGLE_SHEET_URL === 'string' &&
       /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[A-Za-z0-9_-]+\/edit$/.test(env.GOOGLE_SHEET_URL)
       ? env.GOOGLE_SHEET_URL : null;
-    return json({students,feedback,deletedStudents,deletedFeedback,slots,consultants:consultantRows,finalFeedback,finalInvited,activity,items,day,week,staffSession:invitedStaff,integrations:{
+    return json({students,feedback,deletedStudents,deletedFeedback,slots,consultants:consultantRows,finalFeedback,finalInvited,activity,items,emailSchedule:surveySchedule,day,week,staffSession:invitedStaff,integrations:{
       sheet:!!sheet, sheetUrl, retentionMonths,
       reminder:!!(env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET),
       reminderScheduled:env.WEEKLY_EMAIL_SCHEDULE==='daily'}});
@@ -612,6 +641,11 @@ async function api(request,env,ctx,url) {
     const name=text(input.name), address=text(input.email).toLowerCase(), destination=text(input.destination), start=text(input.start_date), end=text(input.end_date);
     if (!name||name.length>100||!destination||destination.length>120||address.length>254||
       !validEmail(address)||!validDate(start)||!validDate(end)||start>end) return fail('Check the student details and program dates.');
+    const monthDay=end.slice(5);
+    const matchingPeriod=programEndWeeks.find(([,first,last])=>monthDay>=first&&monthDay<=last)?.[0]??'custom';
+    const endPeriod=input.end_period;
+    if (endPeriod!==undefined&&endPeriod!=='custom'&&endPeriod!==matchingPeriod)
+      return fail('Choose an end date in the selected week.');
     // Optional: student phone, parent email (emergencies only, never used for forms) and email language.
     const phone=text(input.phone), parentEmail=text(input.parent_email).toLowerCase(), language=studentLanguage(input.language);
     if (phone && !validPhone(phone)) return fail('Check the phone number.');
@@ -620,8 +654,9 @@ async function api(request,env,ctx,url) {
     if (path==='/api/students/update') {
       const studentId=text(input.id);
       const result=await run(db,`UPDATE OR IGNORE students SET name=?, email=?, destination=?, start_date=?, end_date=?,
+        end_period=COALESCE(?,CASE WHEN end_period=? THEN end_period ELSE 'custom' END),
         phone=?, parent_email=?, language=?, token=CASE WHEN email<>? THEN ? ELSE token END WHERE id=? AND deleted_at IS NULL`,
-        name,address,destination,start,end,phone||null,parentEmail||null,language,address,token,studentId);
+        name,address,destination,start,end,endPeriod??null,matchingPeriod,phone||null,parentEmail||null,language,address,token,studentId);
       if (result.meta.changes) { await audit(db,actor,'student edited','student',studentId); return json({saved:true}); }
       const existing=await first(db,'SELECT id FROM students WHERE id=? AND deleted_at IS NULL',studentId);
       return existing ? fail('This student email already exists.',409) : fail('The student record was not found.',404);
@@ -636,8 +671,8 @@ async function api(request,env,ctx,url) {
     const studentId=id();
     if (await first(db,'SELECT id FROM students WHERE email=? AND deleted_at IS NULL',address))
       return fail('This student email already exists.',409);
-    const addStudent=db.prepare('INSERT INTO students (id,name,email,destination,start_date,end_date,token,phone,parent_email,language) VALUES (?,?,?,?,?,?,?,?,?,?)')
-      .bind(studentId,name,address,destination,start,end,token,phone||null,parentEmail||null,language);
+    const addStudent=db.prepare('INSERT INTO students (id,name,email,destination,start_date,end_date,end_period,token,phone,parent_email,language) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(studentId,name,address,destination,start,end,endPeriod??'custom',token,phone||null,parentEmail||null,language);
     try {
       await db.batch([addStudent,...checked.flatMap(item=>itemStatements(db,actor,studentId,item,id()))]);
       await audit(db,actor,'student added','student',studentId);
