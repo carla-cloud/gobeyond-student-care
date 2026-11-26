@@ -547,7 +547,7 @@ const IT={
  'Emergency contact':'Contatto di emergenza',
  'Document':'Documento',
  'Add':'Aggiungi',
- 'Add a detail':'Aggiungi un dettaglio',
+ 'Hide details':'Nascondi dettagli',
  'Passport, visa and documents':'Passaporto, visto e documenti',
  'Passport, visa, family, school, contacts and documents (optional)':'Passaporto, visto, famiglia, scuola, contatti e documenti (facoltativi)',
  'Press Add to include a passport, visa, host family, school, emergency contact or document.':'Premi Aggiungi per inserire passaporto, visto, famiglia ospitante, scuola, contatto di emergenza o documento.',
@@ -558,7 +558,6 @@ const IT={
  'Remove {detail}?':'Rimuovere {detail}?',
  'This detail and its file are deleted for good.':'Questo dettaglio e il suo file vengono eliminati definitivamente.',
  'Keep':'Mantieni',
- 'Back to the student':'Torna allo studente',
  'Save':'Salva',
  'Saving…':'Salvataggio…',
  'Passport number':'Numero di passaporto',
@@ -877,6 +876,8 @@ const views=[['overview','Overview'],['feedback','Feedback'],['students','Studen
 const kindLabel=r=>t(r.kind==='message'?'Message':r.kind==='final'?'Final feedback':'Check-in');
 
 let data,view='overview',demo=false,search='',filter='all';
+// Students tab: the student whose details are open under their row.
+let openStudent=null;
 const active=()=>data.students.filter(s=>s.start_date<=data.day&&s.end_date>=data.day);
 const current=()=>data.feedback.filter(r=>r.week===data.week&&r.kind==='check-in');
 const queue=()=>data.feedback.filter(r=>r.priority!=='routine'&&r.status!=='resolved').sort((a,b)=>Number(b.priority==='urgent')-Number(a.priority==='urgent')||Number(b.need==='week')-Number(a.need==='week')||b.created_at.localeCompare(a.created_at));
@@ -1073,8 +1074,12 @@ function dataView(expandDeleted=false){
   `<section class="card"><div class="card-head"><h2>${t('Student directory')}</h2></div>${table(['Student','Email','Program dates','Details','This week',''],data.students.map(s=>{
    const received=current().some(r=>r.student_id===s.id);
    const state=s.start_date>data.day?'Upcoming':s.end_date<data.day?'Completed':received?'Received':'Awaiting';
-   const actions=`<div class="actions record-actions"><button class="row-link" data-student-page="${esc(s.id)}" aria-label="${t('View {name}',{name:esc(s.name)})}">${t('View')}</button><button class="row-link" data-edit-student="${esc(s.id)}" aria-label="${t('Edit {name}',{name:esc(s.name)})}">${t('Edit')}</button><button class="row-link" data-add-details="${esc(s.id)}" aria-label="${t('Add a detail')}: ${esc(s.name)}">${t('Add a detail')}</button><button class="row-link" data-final-student="${esc(s.id)}">${t('Final feedback')}</button>${demo?'':removalButton('delete','students',s)}</div>`;
-   return `<tr><td>${person(s)}${actions}</td><td>${esc(s.email)}</td><td>${dateLabel(s.start_date)} – ${dateLabel(s.end_date)}</td><td class="note-cell">${detailsCell(s)}</td><td><span class="pill ${received?'resolved':''}">${t(state)}</span></td><td>${s.token?`<button class="row-link" data-copy="${esc(s.id)}">${t('Copy check-in link')}</button>`:t('Sample student')}</td></tr>`;
+   // "Details" opens the student's passport, visa, family, school, contacts and documents right under their row.
+   const open=openStudent===s.id;
+   const toggle=`<button class="row-link details-toggle" data-toggle-details="${esc(s.id)}" aria-expanded="${open}" aria-controls="details-${esc(s.id)}" aria-label="${t(open?'Hide details':'Details')}: ${esc(s.name)}">${t(open?'Hide details':'Details')}</button>`;
+   const actions=`<div class="actions record-actions">${toggle}<button class="row-link" data-student-page="${esc(s.id)}" aria-label="${t('View {name}',{name:esc(s.name)})}">${t('View')}</button><button class="row-link" data-edit-student="${esc(s.id)}" aria-label="${t('Edit {name}',{name:esc(s.name)})}">${t('Edit')}</button><button class="row-link" data-final-student="${esc(s.id)}">${t('Final feedback')}</button>${demo?'':removalButton('delete','students',s)}</div>`;
+   return `<tr class="${open?'row-open':''}"><td>${person(s)}${actions}</td><td>${esc(s.email)}</td><td>${dateLabel(s.start_date)} – ${dateLabel(s.end_date)}</td><td class="note-cell"><button class="details-cell" data-toggle-details="${esc(s.id)}" aria-expanded="${open}" aria-controls="details-${esc(s.id)}">${detailsCell(s)}</button></td><td><span class="pill ${received?'resolved':''}">${t(state)}</span></td><td>${s.token?`<button class="row-link" data-copy="${esc(s.id)}">${t('Copy check-in link')}</button>`:t('Sample student')}</td></tr>`+
+    (open?`<tr class="details-row" id="details-${esc(s.id)}"><td colspan="6"><div class="details-panel" data-details-for="${esc(s.id)}">${detailsSection(s)}</div></td></tr>`:'');
   }),'Add a student to begin tracking their weekly check-ins.')}</section><p class="footnote" id="page-status" role="status"></p>`+
   recentlyDeleted('students',expandDeleted);
  if(view==='settings'){
@@ -1371,17 +1376,17 @@ function detailsSection(s){
    <div class="actions"><button type="button" class="row-link" data-edit-detail="${esc(item.id)}">${t('Edit')}</button><button type="button" class="row-link danger" data-remove-detail="${esc(item.id)}">${t('Remove')}</button></div></li>`).join('')}</ul>`
    :`<p class="empty">${t('Nothing added yet. Press Add to include a passport, visa, host family, school, emergency contact or document.')}</p>`}`;
 }
-function wireDetails(s){
- const find=id=>itemsOf(s.id).find(i=>i.id===id);
- detail.querySelectorAll('[data-add-detail]').forEach(b=>{b.onclick=()=>itemDialog(s,b.dataset.addDetail);});
- detail.querySelectorAll('[data-edit-detail]').forEach(b=>{b.onclick=()=>{const item=find(b.dataset.editDetail);if(item)itemDialog(s,item.kind,item);};});
- detail.querySelectorAll('[data-remove-detail]').forEach(b=>{b.onclick=()=>{const item=find(b.dataset.removeDetail);if(item)removeDetailDialog(s,item);};});
-}
-// Back to the student page with fresh data (and the Students table behind it).
-function reopenStudent(s){
+// Back to the Students tab with this student's details open under their row.
+function showStudentDetails(s,addMenuOpen=false){
+ if(detail.open)detail.close();
+ view='students';openStudent=s.id;
  render();
- const fresh=data.students.find(x=>x.id===s.id);
- if(fresh)studentDialog(fresh);else detail.close();
+ const panel=document.querySelector(`[data-details-for="${CSS.escape(s.id)}"]`);
+ if(!panel)return;
+ const menu=panel.querySelector('.add-menu');
+ if(addMenuOpen)menu.open=true;
+ panel.scrollIntoView({block:'nearest'});
+ (addMenuOpen?menu.querySelector('.add-option'):menu.querySelector('summary')).focus({preventScroll:true});
 }
 function demoSaveDetail(s,entry,item){
  const at=new Date().toISOString();
@@ -1396,9 +1401,9 @@ function itemDialog(s,kind,item=null){
  openDialog(t(item?'Edit {detail}':'Add {detail}',{detail:detailName(kind).toLowerCase()}),`<p class="sub">${esc(s.name)} · ${esc(s.destination)}</p><br>
   <form><div class="detail-fields">${detailFields(kind,'',item?.data||{})}
   ${item?.file_name?`<p class="muted detail-wide">${t('Current file: {name}',{name:esc(item.file_name)})} · ${t('Choosing a new file replaces the current one.')}</p><label class="check detail-wide"><input type="checkbox" name="remove_file"> ${t('Remove the current file')}</label>`:''}</div>
-  <p class="error" role="alert"></p><div class="actions"><button type="submit" class="btn primary">${t('Save')}</button><button type="button" class="btn" data-back>${t('Back to the student')}</button></div></form>`,true);
+  <p class="error" role="alert"></p><div class="actions"><button type="submit" class="btn primary">${t('Save')}</button><button type="button" class="btn" data-back>${t('Cancel')}</button></div></form>`,true);
  const form=detail.querySelector('form');
- form.querySelector('[data-back]').onclick=()=>studentDialog(s);
+ form.querySelector('[data-back]').onclick=()=>detail.close();
  form.onsubmit=async event=>{
   event.preventDefault();
   const button=form.querySelector('[type="submit"]');
@@ -1408,7 +1413,7 @@ function itemDialog(s,kind,item=null){
    const entry=await readDetail(form,kind);
    if(demo)demoSaveDetail(s,entry,item);
    else{await request('/api/items/save',{...entry,id:item?.id,student_id:s.id});data=await request('/api/data');}
-   reopenStudent(s);
+   showStudentDetails(s);
   }catch(error){showError(form,error);}
   finally{button.disabled=false;button.textContent=t('Save');}
  };
@@ -1417,13 +1422,13 @@ function removeDetailDialog(s,item){
  openDialog(t('Remove {detail}?',{detail:detailName(item.kind).toLowerCase()}),`<p class="sub">${esc(s.name)} · ${detailSummary(item)}</p><p class="footnote">${t('This detail and its file are deleted for good.')}</p><br>
   <form><p class="error" role="alert"></p><div class="actions"><button class="btn danger">${t('Remove')}</button><button type="button" class="btn" data-keep>${t('Keep')}</button></div></form>`);
  const form=detail.querySelector('form');
- form.querySelector('[data-keep]').onclick=()=>studentDialog(s);
+ form.querySelector('[data-keep]').onclick=()=>detail.close();
  form.onsubmit=async event=>{
   event.preventDefault();
   try{
    if(demo){data.items=data.items.filter(i=>i.id!==item.id);saveDemo(data);}
    else{await request('/api/items/delete',{id:item.id});data=await request('/api/data');}
-   reopenStudent(s);
+   showStudentDetails(s);
   }catch(error){showError(form,error);}
  };
 }
@@ -1478,11 +1483,12 @@ function addDialog(student){
      const added={...fields,id:crypto.randomUUID()};
      data.students.push(added);
      for(const entry of items)demoSaveDetail(added,entry,null);
+     openStudent=added.id;
     }
     saveDemo(data);
    }else{
     if(student)await request('/api/students/update',{...fields,id:student.id});
-    else await request('/api/students',{...fields,items});
+    else openStudent=(await request('/api/students',{...fields,items})).id||null;
     data=await request('/api/data');
    }
    if(detail.open&&detail.contains(form))detail.close();
@@ -1538,16 +1544,25 @@ app.addEventListener('click',async event=>{
   const student=data.students.find(s=>s.id===button.dataset.studentPage);
   if(student)studentDialog(student);
  }
- // "Add a detail" on a student row: their page, with the Add options already open.
- if(button.dataset.addDetails){
-  const student=data.students.find(s=>s.id===button.dataset.addDetails);
-  if(student){
-   studentDialog(student);
-   const menu=detail.querySelector('.add-menu');
-   menu.open=true;
-   menu.scrollIntoView({block:'center'});
-   menu.querySelector('.add-option').focus();
-  }
+ // Students tab: "Details" (or the Details cell) opens / closes the student's details under their row.
+ if(button.dataset.toggleDetails){
+  const id=button.dataset.toggleDetails;
+  openStudent=openStudent===id?null:id;
+  render();
+  document.querySelector(`.details-toggle[data-toggle-details="${CSS.escape(id)}"]`)?.focus();
+  return;
+ }
+ // Inside the open details: Add (passport, visa, ...), Edit, Remove.
+ const panel=button.closest('[data-details-for]');
+ if(panel){
+  const student=data.students.find(s=>s.id===panel.dataset.detailsFor);
+  if(!student)return;
+  const {addDetail,editDetail,removeDetail}=button.dataset;
+  const item=itemsOf(student.id).find(i=>i.id===(editDetail||removeDetail));
+  if(addDetail)itemDialog(student,addDetail);
+  else if(item&&editDetail)itemDialog(student,item.kind,item);
+  else if(item&&removeDetail)removeDetailDialog(student,item);
+  return;
  }
  if(button.dataset.copyQuote){
   const answer=(data.finalFeedback||[]).find(r=>r.id===button.dataset.copyQuote);
@@ -1844,14 +1859,12 @@ function studentDialog(s){
  const grid=`<div class="table-wrap"><table class="heat"><thead><tr><th>${t('Week of')}</th>${areas.map(([,label])=>`<th>${t(label)}</th>`).join('')}</tr></thead><tbody>${checks.map(r=>`<tr><td>${dateLabel(r.week)}</td>${areas.map(([key])=>`<td>${r[key]?`<span class="pill ${ratingClass(r[key])}">${esc(ratingLabel(r[key]))}</span>`:'—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
  openDialog(esc(s.name),`<p class="sub">${esc(s.destination)}</p>
   <dl class="facts">${facts.map(([k,v])=>`<div><dt>${t(k)}</dt><dd>${v}</dd></div>`).join('')}</dl>
-  ${detailsSection(s)}
   ${checks.length?`<h3>${t('Mood week by week')}</h3>${moodChart(checks.map(r=>({label:dateLabel(r.week),value:r.mood,n:1})))}<h3>${t('How things went, week by week')}</h3>${grid}`:`<p class="empty">${t('No weekly check-ins yet.')}</p>`}
   <h3>${t('All responses')}</h3>${rows.length?`<ul class="timeline">${rows.slice().reverse().map(r=>`<li><button class="row-link" data-open-record="${esc(r.id)}">${dateLabel(r.created_at)} · ${kindLabel(r)}</button> ${pill(r)} <span class="muted">${esc((r.note||areaSummary(r)||'').slice(0,120))}</span></li>`).join('')}</ul>`:`<p class="empty">${t('No responses yet.')}</p>`}
   <h3>${t('Calls')}</h3>${calls.length?`<ul class="timeline">${calls.map(c=>`<li>${callDayLabel(c.starts_at)} ${callTime(c.starts_at)} · ${esc(c.consultant_name)} <span class="pill ${slotClass(c.status)}">${slotLabel(c.status)}</span></li>`).join('')}</ul>`:`<p class="empty">${t('No calls booked.')}</p>`}
   <h3>${t('Final feedback')}</h3>${final?`<p>${stars(final.overall)} · ${t('Recommend')}: ${final.recommend}/10 · <button class="row-link" data-open-final-answer>${t('View answers')}</button></p>`:`<p class="empty">${t('Not received yet.')}</p>`}`,true);
  detail.querySelectorAll('[data-open-record]').forEach(b=>{b.onclick=()=>recordDialog(data.feedback.find(r=>r.id===b.dataset.openRecord));});
  detail.querySelector('[data-open-final-answer]')?.addEventListener('click',()=>finalDialog(final));
- wireDetails(s);
 }
 // Consultants: add, edit, deactivate (inactive = hidden from students and from new availability).
 function consultantsDialog(editing=null){

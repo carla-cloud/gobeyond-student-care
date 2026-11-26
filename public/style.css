@@ -142,3 +142,12 @@ table.heat td:first-child,table.heat th:first-child{text-align:left}
 .detail-item .actions{flex-shrink:0}
 .missing{color:#855109;background:#fff6e8;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;margin:0 0 10px}
 @media(max-width:700px){.detail-fields{grid-template-columns:1fr}.detail-item{flex-direction:column}}
+/* Students tab: details open under the student's row */
+tr.row-open>td{background:#f7faff}
+tr.details-row>td{padding:0 19px 18px;background:#f7faff;white-space:normal}
+.details-panel{background:white;border:1px solid var(--line);border-radius:10px;padding:2px 16px 14px}
+.details-panel .section-head{margin-top:12px}
+.details-panel h3{font-size:15px}
+.details-toggle{color:var(--blue)}
+.details-cell{background:none;padding:0;text-align:left;color:inherit;cursor:pointer;border-radius:6px}
+.details-cell:hover .pill{box-shadow:0 0 0 1px #9fc0f5}
