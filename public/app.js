@@ -539,7 +539,99 @@ const IT={
  'This student is in Recently deleted. Restore them to use this email.':'Questo studente è in Eliminati di recente. Ripristinalo per usare questa email.',
  'Choose a record.':'Scegli un elemento.',
  'This student already has a check-in for that week.':'Questo studente ha già un check-in per quella settimana.',
- 'The record was not found.':'Elemento non trovato.'
+ 'The record was not found.':'Elemento non trovato.',
+ // Student details: passport, visa, host family / residence, school, emergency contacts, documents
+ 'Passport':'Passaporto',
+ 'Visa':'Visto',
+ 'Host family / residence':'Famiglia ospitante / residenza',
+ 'Emergency contact':'Contatto di emergenza',
+ 'Document':'Documento',
+ 'Add':'Aggiungi',
+ 'Add a detail':'Aggiungi un dettaglio',
+ 'Passport, visa and documents':'Passaporto, visto e documenti',
+ 'Passport, visa, family, school, contacts and documents (optional)':'Passaporto, visto, famiglia, scuola, contatti e documenti (facoltativi)',
+ 'Press Add to include a passport, visa, host family, school, emergency contact or document.':'Premi Aggiungi per inserire passaporto, visto, famiglia ospitante, scuola, contatto di emergenza o documento.',
+ 'Nothing added yet. Press Add to include a passport, visa, host family, school, emergency contact or document.':'Ancora niente. Premi Aggiungi per inserire passaporto, visto, famiglia ospitante, scuola, contatto di emergenza o documento.',
+ 'Remove this section':'Rimuovi questa sezione',
+ 'Add {detail}':'Aggiungi {detail}',
+ 'Edit {detail}':'Modifica {detail}',
+ 'Remove {detail}?':'Rimuovere {detail}?',
+ 'This detail and its file are deleted for good.':'Questo dettaglio e il suo file vengono eliminati definitivamente.',
+ 'Keep':'Mantieni',
+ 'Back to the student':'Torna allo studente',
+ 'Save':'Salva',
+ 'Saving…':'Salvataggio…',
+ 'Passport number':'Numero di passaporto',
+ 'Issuing country':'Paese di rilascio',
+ 'Issue date':'Data di rilascio',
+ 'Expiry date':'Data di scadenza',
+ 'Expiry date (optional)':'Data di scadenza (facoltativa)',
+ 'Notes':'Note',
+ 'Visa type':'Tipo di visto',
+ 'e.g. J-1, F-1, Student visa':'es. J-1, F-1, visto per studio',
+ 'To apply':'Da richiedere',
+ 'Applied':'Richiesto',
+ 'Approved':'Approvato',
+ 'Refused':'Rifiutato',
+ 'Not needed':'Non necessario',
+ 'Visa number':'Numero del visto',
+ 'Valid from':'Valido dal',
+ 'Valid until':'Valido fino al',
+ 'Residence / boarding school':'Residenza / college',
+ 'Family or residence name':'Nome della famiglia o della residenza',
+ 'Address':'Indirizzo',
+ 'Living there from':'Ci vive dal',
+ 'Notes (family members, pets, house rules…)':'Note (componenti della famiglia, animali, regole di casa…)',
+ 'School name':'Nome della scuola',
+ 'Contact person':'Referente',
+ 'Grade / year':'Classe / anno',
+ 'Start date':'Data di inizio',
+ 'Relationship':'Parentela / ruolo',
+ 'e.g. Mother, Father, Local coordinator':'es. Madre, Padre, Coordinatore locale',
+ 'Title':'Titolo',
+ 'e.g. Health insurance policy':'es. Polizza assicurativa sanitaria',
+ 'Category':'Categoria',
+ 'Insurance':'Assicurazione',
+ 'School letter':'Lettera della scuola',
+ 'Medical':'Medico',
+ 'Travel / flights':'Viaggio / voli',
+ 'Consent form':'Modulo di consenso',
+ 'Link (optional)':'Link (facoltativo)',
+ 'File (optional)':'File (facoltativo)',
+ 'PDF, photo or Word file, up to 1 MB. Large photos are made smaller automatically.':'PDF, foto o file Word, fino a 1 MB. Le foto grandi vengono rimpicciolite automaticamente.',
+ 'Current file: {name}':'File attuale: {name}',
+ 'Remove the current file':'Rimuovi il file attuale',
+ 'Choosing a new file replaces the current one.':'Scegliendo un nuovo file sostituisci quello attuale.',
+ 'Open file':'Apri file',
+ 'Sample file (not stored)':'File di esempio (non salvato)',
+ 'No. {number}':'N. {number}',
+ 'expires {date}':'scade il {date}',
+ 'valid until {date}':'valido fino al {date}',
+ 'from {date}':'dal {date}',
+ 'Expired':'Scaduto',
+ 'Expires before the program ends':'Scade prima della fine del programma',
+ 'Missing: {list}':'Mancano: {list}',
+ '{n} of {total}':'{n} di {total}',
+ 'Check expiry':'Controlla scadenza',
+ 'All key details added':'Tutti i dettagli principali inseriti',
+ 'Choose what to add.':'Scegli cosa aggiungere.',
+ 'Fill in the required fields.':'Compila i campi obbligatori.',
+ 'One of the answers is too long.':'Una delle risposte è troppo lunga.',
+ 'Check the dates.':'Controlla le date.',
+ 'Check the email address.':'Controlla l’indirizzo email.',
+ 'Links must start with https://':'I link devono iniziare con https://',
+ 'Choose one of the options.':'Scegli una delle opzioni.',
+ 'Attach a PDF, JPG, PNG, WEBP, HEIC or Word file.':'Allega un file PDF, JPG, PNG, WEBP, HEIC o Word.',
+ 'The file is too large (maximum 1 MB).':'Il file è troppo grande (massimo 1 MB).',
+ 'Too many details at once.':'Troppi dettagli insieme.',
+ 'This detail was not found. Reload the page and try again.':'Dettaglio non trovato. Ricarica la pagina e riprova.',
+ 'This student already has the maximum number of details.':'Questo studente ha già il numero massimo di dettagli.',
+ 'This file was not found.':'File non trovato.',
+ 'The student was added, but the details could not be saved. Add them from the student page.':'Lo studente è stato aggiunto, ma i dettagli non sono stati salvati. Aggiungili dalla pagina dello studente.',
+ 'detail added':'dettaglio aggiunto',
+ 'detail edited':'dettaglio modificato',
+ 'detail removed':'dettaglio rimosso',
+ 'file opened':'file aperto'
 };
 // Translate English text into the current language, filling {placeholders} from vars.
 function t(text,vars={}){
@@ -743,10 +835,23 @@ const exampleData=()=>{
    {at:ago(2),actor:'carla@example.com',action:'call cancelled',object_type:'slot',details:'Giorgia · Giulia Romano'},
    {at:ago(26),actor:'carla@example.com',action:'recurring availability added',object_type:'slot',details:'maria · 09:00-12:30, 14:00-18:00 · 4 weeks'},
    {at:ago(50),actor:'staff@example.com',action:'student added',object_type:'student',details:'Beatrice Gallo'}],
+  // Sample passport, visa, family, school, contacts and documents (Sofia has everything, Giulia's passport needs renewing).
+  items:[
+   ['sample-0','passport',{number:'YA1234567',country:'Italia',issued:dateAfter(-900),expires:dateAfter(2400)},'passaporto-sofia.pdf',284000],
+   ['sample-0','visa',{type:'Study permit',status:'approved',number:'F301234567',valid_from:dateAfter(-70),valid_until:dateAfter(120)},'study-permit.jpg',412000],
+   ['sample-0','family',{type:'family',name:'Thompson family',address:'14 Maple Ave, Toronto',phone:'+1 416 555 0182',email:'thompsons@example.com',from:dateAfter(-60),notes:'Two children (8 and 12), a dog. Curfew 22:00 on school nights.'}],
+   ['sample-0','school',{name:'Riverdale Collegiate Institute',grade:'Grade 11',contact:'Ms. Clarke (international office)',phone:'+1 416 555 0100',from:dateAfter(-58)}],
+   ['sample-0','contact',{name:'Laura Rossi',relationship:'Mother',phone:'+39 333 111 2233',email:'laura.rossi@example.com'}],
+   ['sample-0','document',{title:'Health insurance policy',category:'insurance',expires:dateAfter(95)},'assicurazione.pdf',198000],
+   ['sample-2','passport',{number:'YB7654321',country:'Italia',expires:dateAfter(40),notes:'Renewal appointment to book at the consulate.'}],
+   ['sample-2','contact',{name:'Paolo Romano',relationship:'Father',phone:'+39 347 555 6677'}],
+   ['sample-1','family',{type:'residence',name:'St. Patrick’s boarding house',address:'Dublin 4'}],
+   ['sample-1','contact',{name:'Anna Bianchi',relationship:'Mother',phone:'+39 320 444 5566'}]
+  ].map(([student_id,kind,data,file_name,file_size],i)=>({id:'demo-item-'+i,student_id,kind,data,file_name:file_name||null,file_size:file_size||null,created_at:ago(100+i),updated_at:ago(100+i)})),
   day,week:currentWeek,integrations:{sheet:false,reminder:false}
  };
 };
-const demoKey='gobeyond-demo-v5';
+const demoKey='gobeyond-demo-v6';
 function readDemo(){
  try {const data=JSON.parse(localStorage.getItem(demoKey));if(data?.week===currentWeek) return data;}catch{}
  return exampleData();
@@ -965,11 +1070,11 @@ function dataView(expandDeleted=false){
  if(view==='calendar') return calendarView();
  if(view==='final') return finalView();
  if(view==='students') return title('Students','Manage program dates and personal check-in links.',btn('Add student','add','plus',true))+
-  `<section class="card"><div class="card-head"><h2>${t('Student directory')}</h2></div>${table(['Student','Email','Program dates','This week',''],data.students.map(s=>{
+  `<section class="card"><div class="card-head"><h2>${t('Student directory')}</h2></div>${table(['Student','Email','Program dates','Details','This week',''],data.students.map(s=>{
    const received=current().some(r=>r.student_id===s.id);
    const state=s.start_date>data.day?'Upcoming':s.end_date<data.day?'Completed':received?'Received':'Awaiting';
-   const actions=`<div class="actions record-actions"><button class="row-link" data-student-page="${esc(s.id)}" aria-label="${t('View {name}',{name:esc(s.name)})}">${t('View')}</button><button class="row-link" data-edit-student="${esc(s.id)}" aria-label="${t('Edit {name}',{name:esc(s.name)})}">${t('Edit')}</button><button class="row-link" data-final-student="${esc(s.id)}">${t('Final feedback')}</button>${demo?'':removalButton('delete','students',s)}</div>`;
-   return `<tr><td>${person(s)}${actions}</td><td>${esc(s.email)}</td><td>${dateLabel(s.start_date)} – ${dateLabel(s.end_date)}</td><td><span class="pill ${received?'resolved':''}">${t(state)}</span></td><td>${s.token?`<button class="row-link" data-copy="${esc(s.id)}">${t('Copy check-in link')}</button>`:t('Sample student')}</td></tr>`;
+   const actions=`<div class="actions record-actions"><button class="row-link" data-student-page="${esc(s.id)}" aria-label="${t('View {name}',{name:esc(s.name)})}">${t('View')}</button><button class="row-link" data-edit-student="${esc(s.id)}" aria-label="${t('Edit {name}',{name:esc(s.name)})}">${t('Edit')}</button><button class="row-link" data-add-details="${esc(s.id)}" aria-label="${t('Add a detail')}: ${esc(s.name)}">${t('Add a detail')}</button><button class="row-link" data-final-student="${esc(s.id)}">${t('Final feedback')}</button>${demo?'':removalButton('delete','students',s)}</div>`;
+   return `<tr><td>${person(s)}${actions}</td><td>${esc(s.email)}</td><td>${dateLabel(s.start_date)} – ${dateLabel(s.end_date)}</td><td class="note-cell">${detailsCell(s)}</td><td><span class="pill ${received?'resolved':''}">${t(state)}</span></td><td>${s.token?`<button class="row-link" data-copy="${esc(s.id)}">${t('Copy check-in link')}</button>`:t('Sample student')}</td></tr>`;
   }),'Add a student to begin tracking their weekly check-ins.')}</section><p class="footnote" id="page-status" role="status"></p>`+
   recentlyDeleted('students',expandDeleted);
  if(view==='settings'){
@@ -1160,23 +1265,207 @@ function editResponseDialog(record){
   finally{button.disabled=false;}
  };
 }
-function addDialog(student){
- openDialog(t(student?'Edit student':'Add a student'),`<form>${textField('Full name','name','text','maxlength="100"')}${textField('Email','email','email','maxlength="254"')}${textField('Destination','destination','text','maxlength="120"')}<div class="field-row">${textField('Program start','start_date','date')}${textField('Program end','end_date','date')}</div>
-  <div class="field-row"><label class="field">${t('Phone or WhatsApp (optional)')}<input name="phone" type="tel" maxlength="25" autocomplete="off"></label>
-  <label class="field">${t('Email language')}<select name="language"><option value="">${t('Automatic (Italian until the student chooses)')}</option><option value="it">Italiano</option><option value="en">English</option></select></label></div>
-  <label class="field">${t('Parent email for emergencies (optional)')}<input name="parent_email" type="email" maxlength="254"><small class="muted">${t('Never used for check-ins or the final feedback form.')}</small></label>
-  <p class="error" role="alert"></p><button type="submit" class="btn primary">${t(student?'Save changes':'Add student')}</button></form>`);
- const form=detail.querySelector('form');
- if(student){
-  for(const name of ['name','email','destination','start_date','end_date','phone','parent_email','language'])form.elements[name].value=student[name]??'';
+// ---- Student details: passport, visa, host family / residence, school, emergency contacts, documents ----
+// Same kinds and fields as itemKinds in worker.mjs: [field, label, input type, {required, max, placeholder, values}].
+const detailKinds=[
+ ['passport','Passport',[['number','Passport number','text',{required:true,max:30}],['country','Issuing country','text',{max:60}],['issued','Issue date','date'],['expires','Expiry date','date',{required:true}],['notes','Notes','textarea',{max:500}]]],
+ ['visa','Visa',[['type','Visa type','text',{required:true,max:60,placeholder:'e.g. J-1, F-1, Student visa'}],['status','Status','choice',{required:true,values:[['to apply','To apply'],['applied','Applied'],['approved','Approved'],['refused','Refused'],['not needed','Not needed']]}],['number','Visa number','text',{max:40}],['valid_from','Valid from','date'],['valid_until','Valid until','date'],['notes','Notes','textarea',{max:500}]]],
+ ['family','Host family / residence',[['type','Type','choice',{required:true,values:[['family','Host family'],['residence','Residence / boarding school']]}],['name','Family or residence name','text',{required:true,max:120}],['address','Address','text',{max:300}],['phone','Phone','tel',{max:25}],['email','Email','email',{max:254}],['from','Living there from','date'],['notes','Notes (family members, pets, house rules…)','textarea',{max:1000}]]],
+ ['school','School',[['name','School name','text',{required:true,max:150}],['address','Address','text',{max:300}],['contact','Contact person','text',{max:120}],['phone','Phone','tel',{max:25}],['email','Email','email',{max:254}],['grade','Grade / year','text',{max:60}],['from','Start date','date'],['notes','Notes','textarea',{max:500}]]],
+ ['contact','Emergency contact',[['name','Full name','text',{required:true,max:100}],['relationship','Relationship','text',{max:60,placeholder:'e.g. Mother, Father, Local coordinator'}],['phone','Phone','tel',{required:true,max:25}],['email','Email','email',{max:254}],['notes','Notes','textarea',{max:300}]]],
+ ['document','Document',[['title','Title','text',{required:true,max:120,placeholder:'e.g. Health insurance policy'}],['category','Category','choice',{required:true,values:[['insurance','Insurance'],['school letter','School letter'],['medical','Medical'],['travel','Travel / flights'],['consent form','Consent form'],['other','Other']]}],['expires','Expiry date (optional)','date'],['link','Link (optional)','url',{max:500,placeholder:'https://…'}],['notes','Notes','textarea',{max:500}]]]
+];
+// The details every student should have; documents are extra.
+const keyDetails=['passport','visa','family','school','contact'];
+const detailKind=kind=>detailKinds.find(([key])=>key===kind);
+const detailName=kind=>t(detailKind(kind)[1]);
+const itemsOf=studentId=>(data.items||[]).filter(i=>i.student_id===studentId);
+const choiceLabel=(kind,name,value)=>{const rule=detailKind(kind)[2].find(([key])=>key===name);return t(rule?.[3]?.values?.find(([key])=>key===value)?.[1]??value);};
+const mailLink=email=>`<a href="mailto:${esc(email)}">${esc(email)}</a>`;
+const longDate=value=>value?dateLabel(value,{day:'numeric',month:'short',year:'numeric'}):'';
+// Files: PDF, photo or Word, at most 1 MB (kept in the database). Large photos are shrunk in the browser first.
+const maxFileBytes=1024*1024;
+const fileTypes={pdf:'application/pdf',jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',heic:'image/heic',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'};
+const fileAccept=Object.keys(fileTypes).map(ext=>'.'+ext).join(',');
+const fileSize=bytes=>bytes>=1024*1024?(bytes/1048576).toFixed(1)+' MB':Math.max(1,Math.round(bytes/1024))+' KB';
+async function fileForUpload(file){
+ let type=Object.values(fileTypes).includes(file.type)?file.type:fileTypes[(file.name.split('.').pop()||'').toLowerCase()];
+ if(!type)throw new Error('Attach a PDF, JPG, PNG, WEBP, HEIC or Word file.');
+ let blob=file,name=file.name;
+ if(blob.size>maxFileBytes&&['image/jpeg','image/png','image/webp'].includes(type)){
+  try{
+   const bitmap=await createImageBitmap(file);
+   const scale=Math.min(1,2000/Math.max(bitmap.width,bitmap.height));
+   const canvas=document.createElement('canvas');
+   canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);
+   const ctx=canvas.getContext('2d');
+   ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+   ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
+   for(const quality of [0.85,0.7,0.55]){
+    const smaller=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',quality));
+    if(smaller){blob=smaller;type='image/jpeg';name=name.replace(/\.[^.]+$/,'')+'.jpg';}
+    if(blob.size<=maxFileBytes)break;
+   }
+  }catch{}
  }
+ if(blob.size>maxFileBytes)throw new Error('The file is too large (maximum 1 MB).');
+ const bytes=new Uint8Array(await blob.arrayBuffer());
+ let binary='';
+ for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+ return {name,type,content:btoa(binary)};
+}
+// Form fields of one detail; `prefix` keeps several sections apart in the Add student form.
+function detailFields(kind,prefix='',values={}){
+ return detailKind(kind)[2].map(([name,label,type,o={}])=>{
+  const attrs=`name="${prefix}${name}" ${o.required?'required':''} ${o.max?`maxlength="${o.max}"`:''} ${o.placeholder?`placeholder="${esc(t(o.placeholder))}"`:''}`;
+  const value=esc(values[name]??'');
+  const input=type==='textarea'?`<textarea ${attrs} rows="2">${value}</textarea>`
+   :type==='choice'?`<select ${attrs}>${o.values.map(([key,text])=>`<option value="${esc(key)}" ${values[name]===key?'selected':''}>${esc(t(text))}</option>`).join('')}</select>`
+   :`<input ${attrs} type="${type}" value="${value}" autocomplete="off">`;
+  return `<label class="field ${type==='textarea'?'detail-wide':''}">${t(label)}${input}</label>`;
+ }).join('')+`<label class="field detail-wide">${t('File (optional)')}<input name="${prefix}file" type="file" accept="${fileAccept}"><small class="muted">${t('PDF, photo or Word file, up to 1 MB. Large photos are made smaller automatically.')}</small></label>`;
+}
+async function readDetail(form,kind,prefix=''){
+ const values=Object.fromEntries(detailKind(kind)[2].map(([name])=>[name,(form.elements[prefix+name]?.value||'').trim()]));
+ const picked=form.elements[prefix+'file']?.files?.[0];
+ return {kind,data:values,file:picked?await fileForUpload(picked):null,remove_file:!!form.elements[prefix+'remove_file']?.checked};
+}
+// "Add" button: a click shows the six options.
+const addMenu=attr=>`<details class="add-menu"><summary class="btn primary">${icon('plus',16)}${t('Add')}</summary><div class="add-options">${detailKinds.map(([kind,label])=>`<button type="button" class="add-option" ${attr}="${kind}">${icon('plus',14)}${t(label)}</button>`).join('')}</div></details>`;
+function detailSummary(item){
+ const d=item.data||{};
+ const parts={
+  passport:[d.number&&t('No. {number}',{number:esc(d.number)}),esc(d.country||''),d.expires&&t('expires {date}',{date:longDate(d.expires)})],
+  visa:[`<b>${esc(d.type)}</b>`,d.status&&choiceLabel('visa','status',d.status),d.number&&t('No. {number}',{number:esc(d.number)}),d.valid_until&&t('valid until {date}',{date:longDate(d.valid_until)})],
+  family:[choiceLabel('family','type',d.type),`<b>${esc(d.name)}</b>`,esc(d.address||''),d.phone&&phoneLink(d.phone),d.email&&mailLink(d.email),d.from&&t('from {date}',{date:longDate(d.from)})],
+  school:[`<b>${esc(d.name)}</b>`,esc(d.grade||''),esc(d.address||''),esc(d.contact||''),d.phone&&phoneLink(d.phone),d.email&&mailLink(d.email),d.from&&t('from {date}',{date:longDate(d.from)})],
+  contact:[`<b>${esc(d.name)}</b>`,esc(d.relationship||''),d.phone&&phoneLink(d.phone),d.email&&mailLink(d.email)],
+  document:[`<b>${esc(d.title)}</b>`,d.category&&choiceLabel('document','category',d.category),d.expires&&t('expires {date}',{date:longDate(d.expires)}),
+   /^https:\/\//i.test(d.link||'')&&`<a href="${esc(d.link)}" target="_blank" rel="noopener noreferrer">${t('Link')}</a>`]
+ }[item.kind]||[];
+ return parts.filter(Boolean).join(' · ');
+}
+// Passport / visa that expire before the program ends, or anything already expired.
+function detailWarnings(item,student){
+ const end=item.data?.expires||item.data?.valid_until;
+ if(!end)return [];
+ if(end<data.day)return [t('Expired')];
+ return ['passport','visa'].includes(item.kind)&&end<student.end_date?[t('Expires before the program ends')]:[];
+}
+function detailsCell(s){
+ const items=itemsOf(s.id);
+ const missing=keyDetails.filter(kind=>!items.some(i=>i.kind===kind));
+ const warn=items.some(i=>detailWarnings(i,s).length);
+ return `<span class="pill ${missing.length?'':'resolved'}">${t('{n} of {total}',{n:keyDetails.length-missing.length,total:keyDetails.length})}</span>${warn?` <span class="pill follow">${t('Check expiry')}</span>`:''}<span class="cell-sub muted">${missing.length?t('Missing: {list}',{list:missing.map(detailName).join(', ')}):t('All key details added')}</span>`;
+}
+function detailsSection(s){
+ const items=detailKinds.flatMap(([kind])=>itemsOf(s.id).filter(i=>i.kind===kind));
+ const missing=keyDetails.filter(kind=>!items.some(i=>i.kind===kind));
+ const file=item=>!item.file_name?'':demo
+  ?`<small class="muted">📎 ${esc(item.file_name)} · ${t('Sample file (not stored)')}</small>`
+  :`<a class="file-link" href="/api/items/file?id=${encodeURIComponent(item.id)}" target="_blank" rel="noopener">📎 ${esc(item.file_name)} (${fileSize(item.file_size)})</a>`;
+ return `<div class="section-head"><h3>${t('Passport, visa and documents')}</h3>${addMenu('data-add-detail')}</div>
+  ${missing.length?`<p class="missing">${t('Missing: {list}',{list:missing.map(detailName).join(', ')})}</p>`:''}
+  ${items.length?`<ul class="detail-list">${items.map(item=>`<li class="detail-item"><div><b class="detail-kind">${detailName(item.kind)}</b>${detailWarnings(item,s).map(w=>`<span class="pill follow">${w}</span>`).join(' ')}
+   <div>${detailSummary(item)}</div>${item.data.notes?`<small class="muted">${esc(item.data.notes)}</small>`:''}${file(item)}</div>
+   <div class="actions"><button type="button" class="row-link" data-edit-detail="${esc(item.id)}">${t('Edit')}</button><button type="button" class="row-link danger" data-remove-detail="${esc(item.id)}">${t('Remove')}</button></div></li>`).join('')}</ul>`
+   :`<p class="empty">${t('Nothing added yet. Press Add to include a passport, visa, host family, school, emergency contact or document.')}</p>`}`;
+}
+function wireDetails(s){
+ const find=id=>itemsOf(s.id).find(i=>i.id===id);
+ detail.querySelectorAll('[data-add-detail]').forEach(b=>{b.onclick=()=>itemDialog(s,b.dataset.addDetail);});
+ detail.querySelectorAll('[data-edit-detail]').forEach(b=>{b.onclick=()=>{const item=find(b.dataset.editDetail);if(item)itemDialog(s,item.kind,item);};});
+ detail.querySelectorAll('[data-remove-detail]').forEach(b=>{b.onclick=()=>{const item=find(b.dataset.removeDetail);if(item)removeDetailDialog(s,item);};});
+}
+// Back to the student page with fresh data (and the Students table behind it).
+function reopenStudent(s){
+ render();
+ const fresh=data.students.find(x=>x.id===s.id);
+ if(fresh)studentDialog(fresh);else detail.close();
+}
+function demoSaveDetail(s,entry,item){
+ const at=new Date().toISOString();
+ const file=entry.file?{file_name:entry.file.name,file_type:entry.file.type,file_size:Math.round(entry.file.content.length*3/4)}
+  :entry.remove_file?{file_name:null,file_type:null,file_size:null}:{};
+ data.items||=[];
+ if(item)Object.assign(data.items.find(i=>i.id===item.id),{data:entry.data,updated_at:at},file);
+ else data.items.push({id:crypto.randomUUID(),student_id:s.id,kind:entry.kind,data:entry.data,created_at:at,updated_at:at,...file});
+ saveDemo(data);
+}
+function itemDialog(s,kind,item=null){
+ openDialog(t(item?'Edit {detail}':'Add {detail}',{detail:detailName(kind).toLowerCase()}),`<p class="sub">${esc(s.name)} · ${esc(s.destination)}</p><br>
+  <form><div class="detail-fields">${detailFields(kind,'',item?.data||{})}
+  ${item?.file_name?`<p class="muted detail-wide">${t('Current file: {name}',{name:esc(item.file_name)})} · ${t('Choosing a new file replaces the current one.')}</p><label class="check detail-wide"><input type="checkbox" name="remove_file"> ${t('Remove the current file')}</label>`:''}</div>
+  <p class="error" role="alert"></p><div class="actions"><button type="submit" class="btn primary">${t('Save')}</button><button type="button" class="btn" data-back>${t('Back to the student')}</button></div></form>`,true);
+ const form=detail.querySelector('form');
+ form.querySelector('[data-back]').onclick=()=>studentDialog(s);
  form.onsubmit=async event=>{
   event.preventDefault();
   const button=form.querySelector('[type="submit"]');
   button.disabled=true;
-  const fields=Object.fromEntries(new FormData(form));
+  button.textContent=t('Saving…');
+  try{
+   const entry=await readDetail(form,kind);
+   if(demo)demoSaveDetail(s,entry,item);
+   else{await request('/api/items/save',{...entry,id:item?.id,student_id:s.id});data=await request('/api/data');}
+   reopenStudent(s);
+  }catch(error){showError(form,error);}
+  finally{button.disabled=false;button.textContent=t('Save');}
+ };
+}
+function removeDetailDialog(s,item){
+ openDialog(t('Remove {detail}?',{detail:detailName(item.kind).toLowerCase()}),`<p class="sub">${esc(s.name)} · ${detailSummary(item)}</p><p class="footnote">${t('This detail and its file are deleted for good.')}</p><br>
+  <form><p class="error" role="alert"></p><div class="actions"><button class="btn danger">${t('Remove')}</button><button type="button" class="btn" data-keep>${t('Keep')}</button></div></form>`);
+ const form=detail.querySelector('form');
+ form.querySelector('[data-keep]').onclick=()=>studentDialog(s);
+ form.onsubmit=async event=>{
+  event.preventDefault();
+  try{
+   if(demo){data.items=data.items.filter(i=>i.id!==item.id);saveDemo(data);}
+   else{await request('/api/items/delete',{id:item.id});data=await request('/api/data');}
+   reopenStudent(s);
+  }catch(error){showError(form,error);}
+ };
+}
+function addDialog(student){
+ // New students: "Add" offers passport, visa, family, school, emergency contact and document sections.
+ const adder=student?'':`<div class="detail-adder"><div class="section-head"><h3>${t('Passport, visa, family, school, contacts and documents (optional)')}</h3>${addMenu('data-add-section')}</div>
+  <p class="muted" data-adder-hint>${t('Press Add to include a passport, visa, host family, school, emergency contact or document.')}</p><div data-sections></div></div>`;
+ openDialog(t(student?'Edit student':'Add a student'),`<form>${textField('Full name','name','text','maxlength="100"')}${textField('Email','email','email','maxlength="254"')}${textField('Destination','destination','text','maxlength="120"')}<div class="field-row">${textField('Program start','start_date','date')}${textField('Program end','end_date','date')}</div>
+  <div class="field-row"><label class="field">${t('Phone or WhatsApp (optional)')}<input name="phone" type="tel" maxlength="25" autocomplete="off"></label>
+  <label class="field">${t('Email language')}<select name="language"><option value="">${t('Automatic (Italian until the student chooses)')}</option><option value="it">Italiano</option><option value="en">English</option></select></label></div>
+  <label class="field">${t('Parent email for emergencies (optional)')}<input name="parent_email" type="email" maxlength="254"><small class="muted">${t('Never used for check-ins or the final feedback form.')}</small></label>
+  ${adder}<p class="error" role="alert"></p><button type="submit" class="btn primary">${t(student?'Save changes':'Add student')}</button></form>`,!student);
+ const form=detail.querySelector('form');
+ const base=['name','email','destination','start_date','end_date','phone','parent_email','language'];
+ if(student){
+  for(const name of base)form.elements[name].value=student[name]??'';
+ }
+ let sections=0;
+ const hint=()=>{const el=form.querySelector('[data-adder-hint]');if(el)el.hidden=!!form.querySelector('.detail-section');};
+ form.querySelectorAll('[data-add-section]').forEach(option=>{option.onclick=()=>{
+  const kind=option.dataset.addSection,box=document.createElement('fieldset');
+  box.className='detail-section';box.dataset.kind=kind;box.dataset.prefix='s'+(++sections)+'_';
+  box.innerHTML=`<legend>${detailName(kind)}</legend><button type="button" class="row-link muted-link section-remove">${t('Remove')}</button><div class="detail-fields">${detailFields(kind,box.dataset.prefix)}</div>`;
+  box.querySelector('.section-remove').onclick=()=>{box.remove();hint();};
+  box.querySelector('.section-remove').setAttribute('aria-label',t('Remove this section')+': '+detailName(kind));
+  form.querySelector('[data-sections]').append(box);
+  option.closest('details').open=false;
+  hint();
+  box.querySelector('input,select,textarea').focus();
+ };});
+ form.onsubmit=async event=>{
+  event.preventDefault();
+  const button=form.querySelector('[type="submit"]');
+  button.disabled=true;
+  const label=button.textContent;
+  // Files (e.g. a large passport photo) can take a few seconds to prepare and upload.
+  if([...form.querySelectorAll('.detail-section input[type="file"]')].some(input=>input.files.length))button.textContent=t('Saving…');
+  const fields=Object.fromEntries(base.map(name=>[name,form.elements[name].value]));
   try{
    if(fields.start_date>fields.end_date)throw new Error('Choose an end date on or after the start date.');
+   const items=[];
+   for(const box of form.querySelectorAll('.detail-section'))items.push(await readDetail(form,box.dataset.kind,box.dataset.prefix));
    if(demo){
     if(data.students.some(s=>s.id!==student?.id&&s.email.toLowerCase()===fields.email.toLowerCase()))throw new Error('This student email already exists.');
     if(student){
@@ -1185,17 +1474,21 @@ function addDialog(student){
       row.name=student.name;
       row.destination=student.destination;
      }
-    }else data.students.push({...fields,id:crypto.randomUUID()});
+    }else{
+     const added={...fields,id:crypto.randomUUID()};
+     data.students.push(added);
+     for(const entry of items)demoSaveDetail(added,entry,null);
+    }
     saveDemo(data);
    }else{
     if(student)await request('/api/students/update',{...fields,id:student.id});
-    else await request('/api/students',fields);
+    else await request('/api/students',{...fields,items});
     data=await request('/api/data');
    }
    if(detail.open&&detail.contains(form))detail.close();
    render();
   }catch(error){showError(form,error);}
-  finally{button.disabled=false;}
+  finally{button.disabled=false;button.textContent=label;}
  };
 }
 function download(){
@@ -1244,6 +1537,17 @@ app.addEventListener('click',async event=>{
  if(button.dataset.studentPage){
   const student=data.students.find(s=>s.id===button.dataset.studentPage);
   if(student)studentDialog(student);
+ }
+ // "Add a detail" on a student row: their page, with the Add options already open.
+ if(button.dataset.addDetails){
+  const student=data.students.find(s=>s.id===button.dataset.addDetails);
+  if(student){
+   studentDialog(student);
+   const menu=detail.querySelector('.add-menu');
+   menu.open=true;
+   menu.scrollIntoView({block:'center'});
+   menu.querySelector('.add-option').focus();
+  }
  }
  if(button.dataset.copyQuote){
   const answer=(data.finalFeedback||[]).find(r=>r.id===button.dataset.copyQuote);
@@ -1540,12 +1844,14 @@ function studentDialog(s){
  const grid=`<div class="table-wrap"><table class="heat"><thead><tr><th>${t('Week of')}</th>${areas.map(([,label])=>`<th>${t(label)}</th>`).join('')}</tr></thead><tbody>${checks.map(r=>`<tr><td>${dateLabel(r.week)}</td>${areas.map(([key])=>`<td>${r[key]?`<span class="pill ${ratingClass(r[key])}">${esc(ratingLabel(r[key]))}</span>`:'—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
  openDialog(esc(s.name),`<p class="sub">${esc(s.destination)}</p>
   <dl class="facts">${facts.map(([k,v])=>`<div><dt>${t(k)}</dt><dd>${v}</dd></div>`).join('')}</dl>
+  ${detailsSection(s)}
   ${checks.length?`<h3>${t('Mood week by week')}</h3>${moodChart(checks.map(r=>({label:dateLabel(r.week),value:r.mood,n:1})))}<h3>${t('How things went, week by week')}</h3>${grid}`:`<p class="empty">${t('No weekly check-ins yet.')}</p>`}
   <h3>${t('All responses')}</h3>${rows.length?`<ul class="timeline">${rows.slice().reverse().map(r=>`<li><button class="row-link" data-open-record="${esc(r.id)}">${dateLabel(r.created_at)} · ${kindLabel(r)}</button> ${pill(r)} <span class="muted">${esc((r.note||areaSummary(r)||'').slice(0,120))}</span></li>`).join('')}</ul>`:`<p class="empty">${t('No responses yet.')}</p>`}
   <h3>${t('Calls')}</h3>${calls.length?`<ul class="timeline">${calls.map(c=>`<li>${callDayLabel(c.starts_at)} ${callTime(c.starts_at)} · ${esc(c.consultant_name)} <span class="pill ${slotClass(c.status)}">${slotLabel(c.status)}</span></li>`).join('')}</ul>`:`<p class="empty">${t('No calls booked.')}</p>`}
   <h3>${t('Final feedback')}</h3>${final?`<p>${stars(final.overall)} · ${t('Recommend')}: ${final.recommend}/10 · <button class="row-link" data-open-final-answer>${t('View answers')}</button></p>`:`<p class="empty">${t('Not received yet.')}</p>`}`,true);
  detail.querySelectorAll('[data-open-record]').forEach(b=>{b.onclick=()=>recordDialog(data.feedback.find(r=>r.id===b.dataset.openRecord));});
  detail.querySelector('[data-open-final-answer]')?.addEventListener('click',()=>finalDialog(final));
+ wireDetails(s);
 }
 // Consultants: add, edit, deactivate (inactive = hidden from students and from new availability).
 function consultantsDialog(editing=null){

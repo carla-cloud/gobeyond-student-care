@@ -131,8 +131,98 @@ const auditTableSql = `CREATE TABLE IF NOT EXISTS audit_log (
 )`;
 const audit = (db,actor,action,objectType,objectId,details='') =>
   run(db,'INSERT INTO audit_log (id,at,actor,action,object_type,object_id,details) VALUES (?,?,?,?,?,?,?)',id(),now(),actor||'staff',action,objectType,objectId||null,String(details).slice(0,300));
+// Student details that staff add by hand (same tables as drizzle/0008_student_details.sql): passport, visa,
+// host family / residence, school abroad, emergency contacts and other documents. Each detail is one row whose
+// `data` holds the fields below as JSON, and it can carry one file (e.g. the passport scan) in student_files.
+const field = (type,options={}) => ({type,max:type==='text'?300:254,...options});
+const itemKinds = {
+  passport:{label:'Passport',fields:{number:field('text',{max:30,required:true}),country:field('text',{max:60}),
+    issued:field('date'),expires:field('date',{required:true}),notes:field('text',{max:500})}},
+  visa:{label:'Visa',fields:{type:field('text',{max:60,required:true}),
+    status:field('choice',{values:['to apply','applied','approved','refused','not needed'],required:true}),
+    number:field('text',{max:40}),valid_from:field('date'),valid_until:field('date'),notes:field('text',{max:500})}},
+  family:{label:'Host family / residence',fields:{type:field('choice',{values:['family','residence'],required:true}),
+    name:field('text',{max:120,required:true}),address:field('text'),phone:field('phone'),email:field('email'),
+    from:field('date'),notes:field('text',{max:1000})}},
+  school:{label:'School',fields:{name:field('text',{max:150,required:true}),address:field('text'),contact:field('text',{max:120}),
+    phone:field('phone'),email:field('email'),grade:field('text',{max:60}),from:field('date'),notes:field('text',{max:500})}},
+  contact:{label:'Emergency contact',fields:{name:field('text',{max:100,required:true}),relationship:field('text',{max:60}),
+    phone:field('phone',{required:true}),email:field('email'),notes:field('text',{max:300})}},
+  document:{label:'Document',fields:{title:field('text',{max:120,required:true}),
+    category:field('choice',{values:['insurance','school letter','medical','travel','consent form','other'],required:true}),
+    expires:field('date'),link:field('url',{max:500}),notes:field('text',{max:500})}}
+};
+const itemsTableSql = [`CREATE TABLE IF NOT EXISTS student_items (
+ id TEXT PRIMARY KEY, student_id TEXT NOT NULL REFERENCES students(id), kind TEXT NOT NULL, data TEXT NOT NULL,
+ created_at TEXT NOT NULL, created_by TEXT NOT NULL, updated_at TEXT NOT NULL, updated_by TEXT NOT NULL
+)`,'CREATE INDEX IF NOT EXISTS student_items_by_student ON student_items(student_id)',
+`CREATE TABLE IF NOT EXISTS student_files (
+ item_id TEXT PRIMARY KEY REFERENCES student_items(id), name TEXT NOT NULL, type TEXT NOT NULL, size INTEGER NOT NULL,
+ content TEXT NOT NULL, uploaded_at TEXT NOT NULL, uploaded_by TEXT NOT NULL
+)`];
+const itemsSql = `SELECT i.id,i.student_id,i.kind,i.data,i.created_at,i.created_by,i.updated_at,i.updated_by,
+  f.name AS file_name,f.type AS file_type,f.size AS file_size
+  FROM student_items i JOIN students s ON s.id=i.student_id LEFT JOIN student_files f ON f.item_id=i.id
+  WHERE s.deleted_at IS NULL ORDER BY i.created_at`;
+const maxItemsPerStudent = 40;
+// Files are kept in the database as base64 text, so they stay small: 1 MB each (the staff page shrinks photos first).
+const maxFileBytes = 1024*1024;
+const fileTypes = {'application/pdf':'PDF','image/jpeg':'JPG','image/png':'PNG','image/webp':'WEBP','image/heic':'HEIC',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'Word'};
+function itemData(kind,input) {
+  const spec=itemKinds[kind];
+  if (!spec) return {error:'Choose what to add.'};
+  const data={};
+  for (const [name,rule] of Object.entries(spec.fields)) {
+    const value=text(input?.[name]);
+    if (!value) { if (rule.required) return {error:'Fill in the required fields.'}; continue; }
+    if (value.length>rule.max) return {error:'One of the answers is too long.'};
+    if (rule.type==='date' && !validDate(value)) return {error:'Check the dates.'};
+    if (rule.type==='phone' && !validPhone(value)) return {error:'Check the phone number.'};
+    if (rule.type==='email' && !validEmail(value)) return {error:'Check the email address.'};
+    if (rule.type==='url' && !/^https:\/\/\S+$/i.test(value)) return {error:'Links must start with https://'};
+    if (rule.type==='choice' && !rule.values.includes(value)) return {error:'Choose one of the options.'};
+    data[name]=rule.type==='email'?value.toLowerCase():value;
+  }
+  if ((data.issued && data.expires && data.issued>data.expires) || (data.valid_from && data.valid_until && data.valid_from>data.valid_until))
+    return {error:'Check the dates.'};
+  return {data};
+}
+function itemFile(input) {
+  if (input==null) return {file:null};
+  const name=text(input.name).replace(/[\\/:*?"<>|\u0000-\u001f]/g,'_').slice(0,120);
+  const type=text(input.type).toLowerCase();
+  const content=typeof input.content==='string'?input.content:'';
+  if (!name || !fileTypes[type] || !content || content.length%4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(content))
+    return {error:'Attach a PDF, JPG, PNG, WEBP, HEIC or Word file.'};
+  const size=content.length/4*3-(content.endsWith('==')?2:content.endsWith('=')?1:0);
+  if (size>maxFileBytes) return {error:'The file is too large (maximum 1 MB).'};
+  return {file:{name,type,size,content}};
+}
+// Checks one detail coming from the staff page; returns {kind,data,file} or {error}.
+function checkItem(input) {
+  const kind=text(input?.kind);
+  const {data,error}=itemData(kind,input?.data);
+  if (error) return {error};
+  const upload=itemFile(input.file);
+  return upload.error ? {error:upload.error} : {kind,data,file:upload.file};
+}
+async function storeItem(db,actor,student,item,itemId=null,removeFile=false) {
+  const at=now();
+  if (itemId) await run(db,'UPDATE student_items SET data=?,updated_at=?,updated_by=? WHERE id=?',JSON.stringify(item.data),at,actor,itemId);
+  else {
+    itemId=id();
+    await run(db,'INSERT INTO student_items (id,student_id,kind,data,created_at,created_by,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?)',
+      itemId,student.id,item.kind,JSON.stringify(item.data),at,actor,at,actor);
+  }
+  if (item.file || removeFile) await run(db,'DELETE FROM student_files WHERE item_id=?',itemId);
+  if (item.file) await run(db,'INSERT INTO student_files (item_id,name,type,size,content,uploaded_at,uploaded_by) VALUES (?,?,?,?,?,?,?)',
+    itemId,item.file.name,item.file.type,item.file.size,item.file.content,at,actor);
+  return itemId;
+}
+const itemLabel = (kind,data) => itemKinds[kind].label+(data.title||data.name||data.type?' · '+(data.title||data.name||data.type):'');
 async function setupSchema(db) {
-  for (const sql of [areasTableSql,...calendarSql,finalTableSql,auditTableSql]) await run(db,sql);
+  for (const sql of [areasTableSql,...calendarSql,finalTableSql,auditTableSql,...itemsTableSql]) await run(db,sql);
   for (const [table,column,type] of addedColumns) {
     try { await run(db,`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`); }
     catch (error) { if (!/duplicate column/i.test(String(error?.message||error))) throw error; }
@@ -203,6 +293,9 @@ async function anonymize(db,studentId) {
   await run(db,`UPDATE final_feedback SET housing_comment='',school_comment='',social_comment='',local_support_comment='',team_support_comment='',
     best='',improve='',advice='' WHERE student_id=?`,studentId);
   await run(db,'UPDATE slots SET student_phone=NULL WHERE student_id=?',studentId);
+  // Passport, visa, family, school, contacts and documents are personal details: removed completely.
+  await run(db,'DELETE FROM student_files WHERE item_id IN (SELECT id FROM student_items WHERE student_id=?)',studentId);
+  await run(db,'DELETE FROM student_items WHERE student_id=?',studentId);
 }
 const monthsBefore = (date,months) => { const [y,m,d]=date.split('-').map(Number); return new Date(Date.UTC(y,m-1-months,d,12)).toISOString().slice(0,10); };
 const validDate = value => /^\d{4}-\d\d-\d\d$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
@@ -544,12 +637,14 @@ async function api(request,env,ctx,url) {
       all(db,"SELECT id FROM delivery WHERE id LIKE 'final:%' AND state='sent'")
     ]);
     const activity=await all(db,'SELECT at,actor,action,object_type,object_id,details FROM audit_log ORDER BY at DESC LIMIT 60');
+    // Details without file contents (files are downloaded one at a time from /api/items/file).
+    const items=(await all(db,itemsSql)).map(row=>({...row,data:JSON.parse(row.data||'{}')}));
     const retentionMonths=Number.isInteger(Number(env.RETENTION_MONTHS))&&Number(env.RETENTION_MONTHS)>0?Number(env.RETENTION_MONTHS):null;
     const finalInvited=[...new Set(finalDeliveries.map(d=>d.id.split(':').at(1)))];
     const sheetUrl = typeof env.GOOGLE_SHEET_URL === 'string' &&
       /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[A-Za-z0-9_-]+\/edit$/.test(env.GOOGLE_SHEET_URL)
       ? env.GOOGLE_SHEET_URL : null;
-    return json({students,feedback,deletedStudents,deletedFeedback,slots,consultants:consultantRows,finalFeedback,finalInvited,activity,day,week,staffSession:invitedStaff,integrations:{
+    return json({students,feedback,deletedStudents,deletedFeedback,slots,consultants:consultantRows,finalFeedback,finalInvited,activity,items,day,week,staffSession:invitedStaff,integrations:{
       sheet:!!sheet, sheetUrl, retentionMonths,
       reminder:!!(env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET),
       reminderScheduled:env.WEEKLY_EMAIL_SCHEDULE==='daily'}});
@@ -573,10 +668,24 @@ async function api(request,env,ctx,url) {
       const existing=await first(db,'SELECT id FROM students WHERE id=? AND deleted_at IS NULL',studentId);
       return existing ? fail('This student email already exists.',409) : fail('The student record was not found.',404);
     }
+    // Optional details added together with the student (passport, visa, family, school, contacts, documents):
+    // all are checked before anything is saved.
+    const items=Array.isArray(input.items)?input.items:[];
+    if (items.length>maxItemsPerStudent) return fail('Too many details at once.');
+    const checked=items.map(checkItem);
+    const invalid=checked.find(item=>item.error);
+    if (invalid) return fail(invalid.error);
     const studentId=id();
     const result=await run(db,'INSERT OR IGNORE INTO students (id,name,email,destination,start_date,end_date,token,phone,parent_email,language) VALUES (?,?,?,?,?,?,?,?,?,?)',
       studentId,name,address,destination,start,end,token,phone||null,parentEmail||null,language);
-    if (result.meta.changes) { await audit(db,actor,'student added','student',studentId,name); return json({saved:true},201); }
+    if (result.meta.changes) {
+      await audit(db,actor,'student added','student',studentId,name);
+      for (const item of checked) {
+        const itemId=await storeItem(db,actor,{id:studentId},item);
+        await audit(db,actor,'detail added','student item',itemId,itemLabel(item.kind,item.data)+' · '+name);
+      }
+      return json({saved:true,id:studentId},201);
+    }
     const removed=await first(db,'SELECT id FROM students WHERE email=? AND deleted_at IS NOT NULL',address);
     return fail(removed?'This student is in Recently deleted. Restore them to use this email.':'This student email already exists.',409);
   }
@@ -740,6 +849,43 @@ async function api(request,env,ctx,url) {
     const state=await deliver(db,{url:env.REMINDER_WEBHOOK_URL,secret:env.WEBHOOK_SECRET},finalEvent(student,invited?'manual-'+Date.now():1,url.origin));
     if (state==='sent') await audit(db,actor,'final feedback form sent','student',student.id,student.name);
     return state==='sent' ? json({sent:true}) : fail('The email could not be sent. Try again.',502);
+  }
+  // Student details: add or edit one (with an optional file), remove one, open its file.
+  if (path==='/api/items/save' && method==='POST') {
+    const input=await request.json() || {};
+    const student=await first(db,'SELECT id,name FROM students WHERE id=? AND deleted_at IS NULL AND anonymized_at IS NULL',text(input.student_id));
+    if (!student) return fail('The student record was not found.',404);
+    const item=checkItem(input);
+    if (item.error) return fail(item.error);
+    const itemId=text(input.id);
+    if (itemId) {
+      if (!await first(db,'SELECT id FROM student_items WHERE id=? AND student_id=? AND kind=?',itemId,student.id,item.kind))
+        return fail('This detail was not found. Reload the page and try again.',404);
+    } else if ((await first(db,'SELECT COUNT(*) AS n FROM student_items WHERE student_id=?',student.id)).n>=maxItemsPerStudent)
+      return fail('This student already has the maximum number of details.',409);
+    const savedId=await storeItem(db,actor,student,item,itemId||null,input.remove_file===true);
+    await audit(db,actor,itemId?'detail edited':'detail added','student item',savedId,itemLabel(item.kind,item.data)+' · '+student.name);
+    return json({saved:true,id:savedId},itemId?200:201);
+  }
+  if (path==='/api/items/delete' && method==='POST') {
+    const input=await request.json() || {};
+    const item=await first(db,'SELECT i.id,i.kind,i.data,s.name FROM student_items i JOIN students s ON s.id=i.student_id WHERE i.id=? AND s.deleted_at IS NULL',text(input.id));
+    if (!item) return fail('This detail was not found. Reload the page and try again.',404);
+    await run(db,'DELETE FROM student_files WHERE item_id=?',item.id);
+    await run(db,'DELETE FROM student_items WHERE id=?',item.id);
+    await audit(db,actor,'detail removed','student item',item.id,itemLabel(item.kind,JSON.parse(item.data||'{}'))+' · '+item.name);
+    return json({saved:true});
+  }
+  if (path==='/api/items/file' && method==='GET') {
+    const file=await first(db,`SELECT f.name,f.type,f.content,i.id,i.kind,i.data,s.name AS student_name FROM student_files f
+      JOIN student_items i ON i.id=f.item_id JOIN students s ON s.id=i.student_id WHERE f.item_id=? AND s.deleted_at IS NULL`,text(url.searchParams.get('id')));
+    if (!file) return fail('This file was not found.',404);
+    await audit(db,actor,'file opened','student item',file.id,itemLabel(file.kind,JSON.parse(file.data||'{}'))+' · '+file.student_name);
+    const bytes=Uint8Array.from(atob(file.content),ch=>ch.charCodeAt(0));
+    // Types come from a fixed list (never HTML or SVG); PDFs and photos open in the browser, the rest download.
+    const inline=['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type);
+    return new Response(bytes,{headers:{...headers,'content-type':file.type,
+      'content-disposition':(inline?'inline':'attachment')+"; filename*=UTF-8''"+encodeURIComponent(file.name)}});
   }
   return fail('This page does not exist.',404);
 }

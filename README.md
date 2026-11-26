@@ -30,6 +30,14 @@ Clicking **View** on a student opens their page: contact details (phone, parent 
 
 Emails follow the student's language: the language they used on a form, or the one set on their record; Italian until they choose. Final feedback emails with no known language are sent in Italian and English together. New columns on existing tables (`students.phone`, `parent_email`, `language`, `anonymized_at`, `consultants.email`, `active`, `slots.student_phone`, `cancelled_by`) are added by the app on first run.
 
+## Passport, visa, family, school, emergency contacts and documents
+
+Consultants add these by hand. In **Add student**, press **Add** to choose any of: Passport (number, issuing country, issue and expiry date), Visa (type, status: to apply / applied / approved / refused / not needed, number, valid from/until), Host family / residence (type, name, address, phone, email, from, notes), School (name, address, contact person, phone, email, grade, start date), Emergency contact (name, relationship, phone, email) and Document (title, category, expiry, https link). A section can be added more than once (e.g. two emergency contacts). Every item can carry one file (PDF, JPG, PNG, WEBP, HEIC or Word, up to 1 MB; large photos are shrunk in the browser before upload). Everything is checked before the student is saved, so nothing is half-saved.
+
+Later, **Add a detail** on a student's row (or **Add** on their page) offers the same options; each item can be edited or removed, and its file opened. The Students table shows how many of the five key details (passport, visa, family, school, emergency contact) each student has, what is missing, and **Check expiry** when a passport or visa expires before the program ends or anything has already expired.
+
+Details are in `student_items` (fields as JSON) and files in `student_files` (base64, one per item) — `drizzle/0008_student_details.sql`; the app also creates both tables on first run. Only staff can see them; adding, editing, removing and opening a file are recorded in the activity log (without passport or visa numbers). Deleting a student hides their details until restored, and the `RETENTION_MONTHS` rule deletes them completely. Files live in the database, so keep them small; for larger scans, connect file storage (e.g. R2) first.
+
 ## Running locally
 
 Run `npm run dev` with Node.js 24 or later. The local preview uses a SQLite file and simulates a staff session. Use sample data only for testing. `npm run build` packages the hosted Worker. SQLite files stay local.
