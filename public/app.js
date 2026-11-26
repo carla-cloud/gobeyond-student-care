@@ -430,7 +430,8 @@ const IT={
  'Not received yet.':'Non ancora ricevuto.',
  'Average mood':'Umore medio',
  '“Difficult” answers':'Risposte “Difficile”',
- 'Trends over the last 8 weeks':'Andamento delle ultime 8 settimane',
+ 'Trends over the last week':'Andamento degli ultimi 7 giorni',
+ 'No weekly check-ins in this period.':'Nessun check-in settimanale in questo periodo.',
  'Average mood and “Difficult” answers per area, from weekly check-ins.':'Umore medio e risposte “Difficile” per area, dai check-in settimanali.',
  'Where students struggle':'Dove gli studenti hanno difficoltà',
  'Recent activity':'Attività recenti',
@@ -702,7 +703,7 @@ const localCallTime=iso=>{
 const tIn=(context,text)=>lang==='it'&&Object.hasOwn(IT,context+'|'+text)?IT[context+'|'+text]:t(text);
 const slotClass=status=>status==='open'?'resolved':status==='cancelled'?'cancelled':'booked';
 const slotLabel=status=>tIn('slot',capital(status));
-const phoneLink=phone=>`<a href="tel:${esc(String(phone).replace(/\s+/g,''))}">${esc(phone)}</a>`;
+const phoneLink=phone=>phone?`<a href="tel:${esc(String(phone).replace(/\s+/g,''))}">${esc(phone)}</a>`:'';
 // Sample-workspace consultants and slots (the live app gets the same ones from the server).
 const consultantList=[['maria','Maria','+39 320 123 4567'],['francesco','Francesco','+39 331 234 5678'],['giorgia','Giorgia','+39 342 345 6789']];
 const exampleTimes={maria:['09:30','14:00'],francesco:['11:00','16:00'],giorgia:['10:00','15:30']};
@@ -764,7 +765,8 @@ function refocus(clicked,root){
 }
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const capital=value=>value.charAt(0).toUpperCase()+value.slice(1);
-const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const madridDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit'});
+const day=madridDate.format(new Date());
 const dateLabel=(value,options={day:'numeric',month:'short'})=>new Intl.DateTimeFormat(lang==='it'?'it-IT':'en-GB',{...options,timeZone:'Europe/Madrid'}).format(new Date(value.length===10?value+'T12:00:00Z':value));
 const d=new Date(day+'T12:00:00Z');
 d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);
@@ -955,14 +957,14 @@ function calendarView(){
  const consultantButtons=people.map(c=>{
   const mine=daySlots.filter(s=>consultantOf(s)===c.id);
   const count=status=>mine.filter(s=>s.status===status).length;
-  return `<button type="button" class="consultant-btn${calConsultant===c.id?' selected':''}${isActive(c)?'':' inactive'}" data-cal-consultant="${esc(c.id)}" aria-pressed="${calConsultant===c.id}"><b>${esc(c.name)}${isActive(c)?'':` <span class="pill cancelled">${t('Inactive')}</span>`}</b><small>${esc(c.phone)}</small><small>${mine.length?`${slotLabel('open')}: ${count('open')} · ${slotLabel('booked')}: ${count('booked')}${count('cancelled')?` · ${slotLabel('cancelled')}: ${count('cancelled')}`:''}`:t('No times')}</small></button>`;
+  return `<button type="button" class="consultant-btn${calConsultant===c.id?' selected':''}${isActive(c)?'':' inactive'}" data-cal-consultant="${esc(c.id)}" aria-pressed="${calConsultant===c.id}"><b>${esc(c.name)}${isActive(c)?'':` <span class="pill cancelled">${t('Inactive')}</span>`}</b>${c.phone?`<small>${esc(c.phone)}</small>`:''}<small>${mine.length?`${slotLabel('open')}: ${count('open')} · ${slotLabel('booked')}: ${count('booked')}${count('cancelled')?` · ${slotLabel('cancelled')}: ${count('cancelled')}`:''}`:t('No times')}</small></button>`;
  }).join('');
  const person=people.find(c=>c.id===calConsultant);
  const action=s=>s.status==='booked'?`<span class="cell-sub"><button class="row-link danger" data-cancel-slot="${esc(s.id)}">${t('Cancel')}</button></span>`
   :s.status==='open'?`<span class="cell-sub"><button class="row-link muted-link" data-remove-slot="${esc(s.id)}">${t('Remove')}</button></span>`:'';
  const row=s=>`<tr class="slot-${s.status}"><td><b>${callTime(s.starts_at)}–${callTime(s.ends_at)}</b></td><td><span class="pill ${slotClass(s.status)}">${slotLabel(s.status)}</span>${action(s)}${s.status==='cancelled'&&s.cancelled_by?`<span class="cell-sub muted">${t('by {who}',{who:esc(s.cancelled_by)})}</span>`:''}</td><td class="student-cell">${s.student_name?`<span class="student-name">${esc(s.student_name)}</span>${s.student_phone?`<span class="cell-sub">${phoneLink(s.student_phone)}</span>`:''}`:'—'}</td><td class="note-cell">${s.status==='open'?'—':esc(s.note)||t('No written comment.')}</td></tr>`;
  const detailCard=person
-  ?`<section class="card"><div class="card-head"><div><h2>${esc(person.name)} · ${callDayLabel(dayOf(calDay))}</h2><p>${phoneLink(person.phone)}</p></div></div>${table(['Time','Status','Student','Check-in note'],daySlots.filter(s=>consultantOf(s)===person.id).map(row),t('No times for {name} on this day.',{name:esc(person.name)}))}</section>`
+  ?`<section class="card"><div class="card-head"><div><h2>${esc(person.name)} · ${callDayLabel(dayOf(calDay))}</h2>${person.phone?`<p>${phoneLink(person.phone)}</p>`:''}</div></div>${table(['Time','Status','Student','Check-in note'],daySlots.filter(s=>consultantOf(s)===person.id).map(row),t('No times for {name} on this day.',{name:esc(person.name)}))}</section>`
   :`<section class="card"><p class="empty">${t('Choose a consultant to see their times.')}</p></section>`;
  const hasExamples=slots.some(s=>s.status==='open'&&exampleSlotId(s.id));
  return title('Calendar','Consultant calls booked by students from their weekly check-in.',
@@ -1023,7 +1025,7 @@ const exampleSlotId=slotId=>/^(maria|francesco|giorgia)-\d{4}-\d\d-\d\d-\d{4}$/.
 function availabilityDialog(){
  const people=consultantsOf().filter(isActive);
  openDialog(t('Add consultant availability'),`<form>
-  <label class="field">${t('Consultant')}<select name="consultant_id" required>${people.map(c=>`<option value="${esc(c.id)}" ${c.id===calConsultant?'selected':''}>${esc(c.name)} · ${esc(c.phone)}</option>`).join('')}</select></label>
+  <label class="field">${t('Consultant')}<select name="consultant_id" required>${people.map(c=>`<option value="${esc(c.id)}" ${c.id===calConsultant?'selected':''}>${esc(c.name)}${c.phone?' · '+esc(c.phone):''}</option>`).join('')}</select></label>
   <label class="field">${t('Date')}<input name="date" type="date" required min="${callDay(new Date().toISOString())}" value="${calDay&&calDay>=callDay(new Date().toISOString())?calDay:dateAfter(1)}"></label>
   <div class="field-row"><label class="field">${t('From')}<input name="from" type="time" step="300" required value="09:00"></label><label class="field">${t('To')}<input name="to" type="time" step="300" required value="12:00"></label></div>
   <label class="field">${t('Call length')}<select name="minutes">${callLengths.map(n=>`<option value="${n}" ${n===30?'selected':''}>${t('{n} minutes',{n})}</option>`).join('')}</select></label>
@@ -1818,7 +1820,6 @@ async function formPage(){
 const average=values=>{const known=values.filter(v=>v!=null&&v!=='').map(Number);return known.length?known.reduce((a,b)=>a+b,0)/known.length:null;};
 const oneDecimal=n=>n==null?'—':new Intl.NumberFormat(locale(),{minimumFractionDigits:1,maximumFractionDigits:1}).format(n);
 const stars=n=>`<span class="stars" role="img" aria-label="${n}/5">${'★'.repeat(n)}<span class="dim">${'★'.repeat(5-n)}</span></span>`;
-const weekShift=(week,n)=>new Date(Date.parse(week+'T12:00:00Z')+n*7*86400000).toISOString().slice(0,10);
 // A small line chart of mood (1-5) over weeks: faces on the left, week labels underneath.
 function moodChart(points){
  const W=560,H=170,left=40,right=14,top=12,bottom=34;
@@ -1830,18 +1831,28 @@ function moodChart(points){
   <path d="${line}" class="line"/>${known.map(p=>`<circle cx="${x(p.i)}" cy="${y(p.value)}" r="4.5" class="dot"><title>${esc(p.label)}: ${oneDecimal(p.value)}${p.n>1?` (${p.n})`:''}</title></circle>`).join('')}
   ${points.map((p,i)=>`<text x="${x(i)}" y="${H-10}" text-anchor="middle" class="axis">${esc(p.label)}</text>`).join('')}</svg>`;
 }
-// Overview: average mood and "Difficult" answers per area over the last 8 weeks, optionally for one destination.
+// Overview: daily trends for the last seven Madrid calendar days, including today.
 let trendDest='all';
 function trendsCard(){
- if(!data.feedback.some(r=>r.kind==='check-in'))return '';
- const weeks=[...Array(8)].map((_,i)=>weekShift(data.week,i-7));
+ const currentDay=Date.parse(dayOf(data.day));
+ const days=Array.from({length:7},(_,i)=>new Date(currentDay+(i-6)*86400000).toISOString().slice(0,10));
  const destinations=[...new Set(data.students.map(s=>s.destination))].sort();
- const checks=data.feedback.filter(r=>r.kind==='check-in'&&weeks.includes(r.week)&&(trendDest==='all'||r.destination===trendDest));
- const perWeek=weeks.map(week=>{const rows=checks.filter(r=>r.week===week);return {week,n:rows.length,mood:average(rows.map(r=>r.mood)),hard:Object.fromEntries(areas.map(([key])=>[key,rows.filter(r=>r[key]==='difficult').length]))};});
- const most=Math.max(1,...perWeek.flatMap(p=>Object.values(p.hard)));
- const heat=`<div class="table-wrap"><table class="heat"><thead><tr><th>${t('“Difficult” answers')}</th>${perWeek.map(p=>`<th>${dateLabel(p.week)}</th>`).join('')}</tr></thead><tbody>${areas.map(([key,label])=>`<tr><td>${t(label)}</td>${perWeek.map(p=>`<td class="heat-cell level-${p.hard[key]?Math.ceil(p.hard[key]/most*3):0}">${p.hard[key]||''}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
- return `<section class="card trends"><div class="card-head"><div><h2>${t('Trends over the last 8 weeks')}</h2><p>${t('Average mood and “Difficult” answers per area, from weekly check-ins.')}</p></div><select id="trend-dest" aria-label="${t('Destination')}" style="width:auto"><option value="all">${t('All destinations')}</option>${destinations.map(x=>`<option value="${esc(x)}" ${x===trendDest?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
-  <div class="trend-body"><div><h3>${t('Average mood')}</h3>${moodChart(perWeek.map(p=>({label:dateLabel(p.week),value:p.mood,n:p.n})))}</div><div><h3>${t('Where students struggle')}</h3>${heat}</div></div></section>`;
+ const byDay=new Map(days.map(day=>[day,[]]));
+ for(const row of data.feedback){
+  if(row.kind!=='check-in'||(trendDest!=='all'&&row.destination!==trendDest))continue;
+  byDay.get(madridDate.format(new Date(row.created_at)))?.push(row);
+ }
+ const perDay=days.map(day=>{
+  const rows=byDay.get(day);
+  const hard=Object.fromEntries(areas.map(([key])=>[key,rows.filter(r=>r[key]==='difficult').length]));
+  return {label:dateLabel(day),n:rows.length,value:average(rows.map(r=>r.mood)),hard};
+ });
+ const most=Math.max(1,...perDay.flatMap(p=>Object.values(p.hard)));
+ const heat=`<div class="table-wrap"><table class="heat"><thead><tr><th>${t('“Difficult” answers')}</th>${perDay.map(p=>`<th>${p.label}</th>`).join('')}</tr></thead><tbody>${areas.map(([key,label])=>`<tr><td>${t(label)}</td>${perDay.map(p=>`<td class="heat-cell level-${p.hard[key]?Math.ceil(p.hard[key]/most*3):0}">${p.hard[key]||''}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+ const body=perDay.some(p=>p.n)
+  ?`<div class="trend-body"><div><h3>${t('Average mood')}</h3>${moodChart(perDay)}</div><div><h3>${t('Where students struggle')}</h3>${heat}</div></div>`
+  :`<p class="empty">${t('No weekly check-ins in this period.')}</p>`;
+ return `<section class="card trends"><div class="card-head"><div><h2>${t('Trends over the last week')}</h2><p>${t('Average mood and “Difficult” answers per area, from weekly check-ins.')}</p></div><select id="trend-dest" aria-label="${t('Destination')}" style="width:auto"><option value="all">${t('All destinations')}</option>${destinations.map(x=>`<option value="${esc(x)}" ${x===trendDest?'selected':''}>${esc(x)}</option>`).join('')}</select></div>${body}</section>`;
 }
 // Settings: who did what.
 function activityCard(){
@@ -2036,7 +2047,7 @@ function finalStudentDialog(s){
  openDialog(t('Final feedback form'),`<p class="sub">${esc(s.name)} · ${t('Program end')} ${dateLabel(s.end_date)}</p><p class="footnote"><span class="pill ${answer?'resolved':''}">${status}</span></p><br>
   <p class="muted">${t('The form opens 3 days before the end of the program and closes 30 days after it. The invitation is sent automatically on the end date, with reminders after 4 and 10 days.')}</p><br>
   ${s.token?`<label class="field">${t('Final feedback link')}<input readonly value="${esc(finalLink(s))}"></label>`:`<p class="muted">${t('Sample student')}</p>`}
-  <form><p class="error" role="alert"></p><div class="actions">${answer||!s.token?'':`<button class="btn primary">${t('Send the form by email now')}</button>`}${s.token?`<button type="button" class="btn" data-copy-final>${t('Copy link')}</button>`:''}${answer?`<button type="button" class="btn" data-view-final>${t('View answers')}</button>`:''}</div><p class="footnote" role="status" id="final-send-status"></p></form>`);
+  <form><p class="error" role="alert"></p><div class="actions">${(answer||!s.token||!data.integrations?.reminder)?'':`<button class="btn primary">${t('Send the form by email now')}</button>`}${s.token?`<button type="button" class="btn" data-copy-final>${t('Copy link')}</button>`:''}${answer?`<button type="button" class="btn" data-view-final>${t('View answers')}</button>`:''}</div><p class="footnote" role="status" id="final-send-status"></p></form>`);
  const form=detail.querySelector('form');
  detail.querySelector('[data-copy-final]')?.addEventListener('click',async()=>{
   try{await navigator.clipboard.writeText(finalLink(s));form.querySelector('#final-send-status').textContent=t('Link copied.');}catch{detail.querySelector('input[readonly]')?.select();}

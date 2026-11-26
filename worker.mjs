@@ -31,27 +31,6 @@ const rowsSql=feedbackWithStudent+' WHERE f.deleted_at IS NULL AND s.deleted_at 
 const all = async (db,sql,...args) => (await db.prepare(sql).bind(...args).all()).results;
 const first = (db,sql,...args) => db.prepare(sql).bind(...args).first();
 const run = (db,sql,...args) => db.prepare(sql).bind(...args).run();
-// Same table as drizzle/0004_checkin_areas.sql, created here too so the app works even if that migration has not run yet.
-const areasTableSql = `CREATE TABLE IF NOT EXISTS checkin_areas (
- feedback_id TEXT PRIMARY KEY REFERENCES feedback(id),
- studies TEXT NOT NULL, housing TEXT NOT NULL, social TEXT NOT NULL, health TEXT NOT NULL, money TEXT NOT NULL
-)`;
-// Consultant call calendar: same tables as drizzle/0005_consultant_calendar.sql.
-// A slot is 'open' (bookable), 'booked' (by a student from their weekly check-in) or 'cancelled' (by staff; never re-offered).
-const consultants = [['maria','Maria','+39 320 123 4567'],['francesco','Francesco','+39 331 234 5678'],['giorgia','Giorgia','+39 342 345 6789']];
-const calendarSql = [
-  'CREATE TABLE IF NOT EXISTS consultants (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL)',
-  `CREATE TABLE IF NOT EXISTS slots (
- id TEXT PRIMARY KEY, consultant_id TEXT NOT NULL REFERENCES consultants(id),
- starts_at TEXT NOT NULL, ends_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open',
- student_id TEXT REFERENCES students(id), feedback_id TEXT REFERENCES feedback(id),
- booked_at TEXT, cancelled_at TEXT
-)`,
-  "CREATE UNIQUE INDEX IF NOT EXISTS one_booking_per_checkin ON slots(feedback_id) WHERE status='booked'"
-];
-// Example availability (Italian time), created once when there are no slots yet.
-const exampleTimes = {maria:['09:30','14:00'],francesco:['11:00','16:00'],giorgia:['10:00','15:30']};
-const slotMinutes = 30;
 function italianTime(date,time) {
   const [y,m,d]=date.split('-').map(Number), [h,mi]=time.split(':').map(Number);
   const wanted=Date.UTC(y,m-1,d,h,mi);
@@ -73,38 +52,13 @@ function rangeTimes(from,to,minutes) {
 const validTime = value => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 const callLengths = [15,30,45,60];
 const maxSlotsPerAdd = 24;
-function exampleSlots(from) {
-  const days=[];
-  for (let date=shiftDay(from,1); days.length<3; date=shiftDay(date,1)) {
-    const weekday=new Date(date+'T12:00:00Z').getUTCDay();
-    if (weekday!==0 && weekday!==6) days.push(date);
-  }
-  return days.flatMap(date=>consultants.flatMap(([consultant])=>exampleTimes[consultant].map(time=>{
-    const starts=italianTime(date,time);
-    return {id:consultant+'-'+date+'-'+time.replace(':',''),consultant,starts,ends:new Date(Date.parse(starts)+slotMinutes*60000).toISOString()};
-  })));
-}
-// End-of-journey final feedback: same table as drizzle/0006_final_feedback.sql.
-// Topics = questions 4-9 of the form; travel is the only optional rating.
 const finalTopics = ['housing','school','social','local_support','team_support','travel'];
 const finalRequiredTopics = ['housing','school','social','local_support','team_support'];
 const finalTopicNames = {housing:'Host family / boarding house',school:'School and teaching',social:'Friends',local_support:'Local Coordinator / Tutor',team_support:'Go Beyond team',travel:'Travel and arrival'};
 const housingTypes = ['family','boarding','other'];
 const finalOpensBefore = 3, finalClosesAfter = 30;   // days around the student's end date
 const finalEmailDays = [0,4,10];                      // invitation, reminder, last reminder (days after the end date)
-const finalTableSql = `CREATE TABLE IF NOT EXISTS final_feedback (
- id TEXT PRIMARY KEY, student_id TEXT NOT NULL UNIQUE REFERENCES students(id),
- overall INTEGER NOT NULL, recommend INTEGER NOT NULL, housing_type TEXT NOT NULL,
- housing INTEGER NOT NULL, housing_comment TEXT NOT NULL DEFAULT '',
- school INTEGER NOT NULL, school_comment TEXT NOT NULL DEFAULT '',
- social INTEGER NOT NULL, social_comment TEXT NOT NULL DEFAULT '',
- local_support INTEGER NOT NULL, local_support_comment TEXT NOT NULL DEFAULT '',
- team_support INTEGER NOT NULL, team_support_comment TEXT NOT NULL DEFAULT '',
- travel INTEGER, best TEXT NOT NULL DEFAULT '', improve TEXT NOT NULL DEFAULT '', advice TEXT NOT NULL DEFAULT '',
- share_consent INTEGER NOT NULL DEFAULT 0, future_contact INTEGER, language TEXT NOT NULL DEFAULT 'en',
- followup_id TEXT, submitted_at TEXT NOT NULL, deleted_at TEXT
-)`;
-const finalRowsSql = `SELECT ff.*,s.name,s.destination,s.email,s.end_date FROM final_feedback ff JOIN students s ON s.id=ff.student_id`;
+const finalRowsSql = `SELECT ff.*,s.name,s.destination,s.end_date FROM final_feedback ff JOIN students s ON s.id=ff.student_id`;
 const finalWindow = (student,day) => day<shiftDay(student.end_date,-finalOpensBefore) ? 'early' : day>shiftDay(student.end_date,finalClosesAfter) ? 'closed' : 'open';
 // Final feedback emails are in the student's language; with none known yet, Italian and English together.
 const finalTexts = {
@@ -119,16 +73,6 @@ const finalEvent = (s,attempt,origin) => {
   return {id:'final:'+s.id+':'+attempt,kind:'final-feedback',attempt,language:lang||'it+en',to:s.email,name:s.name,
     subject:pick('subject'),message:pick('message'),link:origin+'/final#'+s.token};
 };
-// Columns added after the first release. Added here (not in a migration) so it works whether or not the
-// hosting platform runs migrations first; "duplicate column" means it is already there.
-const addedColumns = [['students','phone','TEXT'],['students','parent_email','TEXT'],['students','language','TEXT'],
-  ['students','anonymized_at','TEXT'],['consultants','email','TEXT'],['consultants','active','INTEGER NOT NULL DEFAULT 1'],
-  ['slots','student_phone','TEXT'],['slots','cancelled_by','TEXT']];
-// Who did what (same table as drizzle/0007_audit_log.sql).
-const auditTableSql = `CREATE TABLE IF NOT EXISTS audit_log (
- id TEXT PRIMARY KEY, at TEXT NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL,
- object_type TEXT NOT NULL, object_id TEXT, details TEXT NOT NULL DEFAULT ''
-)`;
 const audit = (db,actor,action,objectType,objectId,details='') =>
   run(db,'INSERT INTO audit_log (id,at,actor,action,object_type,object_id,details) VALUES (?,?,?,?,?,?,?)',id(),now(),actor||'staff',action,objectType,objectId||null,String(details).slice(0,300));
 // Student details that staff add by hand (same tables as drizzle/0008_student_details.sql): passport, visa,
@@ -152,14 +96,6 @@ const itemKinds = {
     category:field('choice',{values:['insurance','school letter','medical','travel','consent form','other'],required:true}),
     expires:field('date'),link:field('url',{max:500}),notes:field('text',{max:500})}}
 };
-const itemsTableSql = [`CREATE TABLE IF NOT EXISTS student_items (
- id TEXT PRIMARY KEY, student_id TEXT NOT NULL REFERENCES students(id), kind TEXT NOT NULL, data TEXT NOT NULL,
- created_at TEXT NOT NULL, created_by TEXT NOT NULL, updated_at TEXT NOT NULL, updated_by TEXT NOT NULL
-)`,'CREATE INDEX IF NOT EXISTS student_items_by_student ON student_items(student_id)',
-`CREATE TABLE IF NOT EXISTS student_files (
- item_id TEXT PRIMARY KEY REFERENCES student_items(id), name TEXT NOT NULL, type TEXT NOT NULL, size INTEGER NOT NULL,
- content TEXT NOT NULL, uploaded_at TEXT NOT NULL, uploaded_by TEXT NOT NULL
-)`];
 const itemsSql = `SELECT i.id,i.student_id,i.kind,i.data,i.created_at,i.created_by,i.updated_at,i.updated_by,
   f.name AS file_name,f.type AS file_type,f.size AS file_size
   FROM student_items i JOIN students s ON s.id=i.student_id LEFT JOIN student_files f ON f.item_id=i.id
@@ -171,7 +107,7 @@ const fileTypes = {'application/pdf':'PDF','image/jpeg':'JPG','image/png':'PNG',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'Word'};
 function itemData(kind,input) {
   const spec=itemKinds[kind];
-  if (!spec) return {error:'Choose what to add.'};
+  if (!Object.hasOwn(itemKinds,kind)) return {error:'Choose what to add.'};
   const data={};
   for (const [name,rule] of Object.entries(spec.fields)) {
     const value=text(input?.[name]);
@@ -193,7 +129,7 @@ function itemFile(input) {
   const name=text(input.name).replace(/[\\/:*?"<>|\u0000-\u001f]/g,'_').slice(0,120);
   const type=text(input.type).toLowerCase();
   const content=typeof input.content==='string'?input.content:'';
-  if (!name || !fileTypes[type] || !content || content.length%4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(content))
+  if (!name || !Object.hasOwn(fileTypes,type) || !content || content.length%4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(content))
     return {error:'Attach a PDF, JPG, PNG, WEBP, HEIC or Word file.'};
   const size=content.length/4*3-(content.endsWith('==')?2:content.endsWith('=')?1:0);
   if (size>maxFileBytes) return {error:'The file is too large (maximum 1 MB).'};
@@ -207,37 +143,28 @@ function checkItem(input) {
   const upload=itemFile(input.file);
   return upload.error ? {error:upload.error} : {kind,data,file:upload.file};
 }
-async function storeItem(db,actor,student,item,itemId=null,removeFile=false) {
+function itemStatements(db,actor,studentId,item,itemId,editing=false,removeFile=false) {
   const at=now();
-  if (itemId) await run(db,'UPDATE student_items SET data=?,updated_at=?,updated_by=? WHERE id=?',JSON.stringify(item.data),at,actor,itemId);
-  else {
-    itemId=id();
-    await run(db,'INSERT INTO student_items (id,student_id,kind,data,created_at,created_by,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?)',
-      itemId,student.id,item.kind,JSON.stringify(item.data),at,actor,at,actor);
+  const statements=[editing
+    ? db.prepare('UPDATE student_items SET data=?,updated_at=?,updated_by=? WHERE id=?').bind(JSON.stringify(item.data),at,actor,itemId)
+    : db.prepare('INSERT INTO student_items (id,student_id,kind,data,created_at,created_by,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?)')
+        .bind(itemId,studentId,item.kind,JSON.stringify(item.data),at,actor,at,actor)];
+  if (item.file) {
+    statements.push(db.prepare(`INSERT INTO student_files (item_id,name,type,size,content,uploaded_at,uploaded_by) VALUES (?,?,?,?,?,?,?)
+      ON CONFLICT(item_id) DO UPDATE SET name=excluded.name,type=excluded.type,size=excluded.size,content=excluded.content,
+      uploaded_at=excluded.uploaded_at,uploaded_by=excluded.uploaded_by`)
+      .bind(itemId,item.file.name,item.file.type,item.file.size,item.file.content,at,actor));
+  } else if (removeFile) {
+    statements.push(db.prepare('DELETE FROM student_files WHERE item_id=?').bind(itemId));
   }
-  if (item.file || removeFile) await run(db,'DELETE FROM student_files WHERE item_id=?',itemId);
-  if (item.file) await run(db,'INSERT INTO student_files (item_id,name,type,size,content,uploaded_at,uploaded_by) VALUES (?,?,?,?,?,?,?)',
-    itemId,item.file.name,item.file.type,item.file.size,item.file.content,at,actor);
-  return itemId;
+  return statements;
 }
-const itemLabel = (kind,data) => itemKinds[kind].label+(data.title||data.name||data.type?' · '+(data.title||data.name||data.type):'');
-async function setupSchema(db) {
-  for (const sql of [areasTableSql,...calendarSql,finalTableSql,auditTableSql,...itemsTableSql]) await run(db,sql);
-  for (const [table,column,type] of addedColumns) {
-    try { await run(db,`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`); }
-    catch (error) { if (!/duplicate column/i.test(String(error?.message||error))) throw error; }
-  }
-  for (const [key,name,phone] of consultants) await run(db,'INSERT OR IGNORE INTO consultants (id,name,phone) VALUES (?,?,?)',key,name,phone);
-  if (await first(db,'SELECT 1 AS found FROM slots LIMIT 1')) return;
-  for (const slot of exampleSlots(today()))
-    await run(db,"INSERT OR IGNORE INTO slots (id,consultant_id,starts_at,ends_at,status) VALUES (?,?,?,?,'open')",slot.id,slot.consultant,slot.starts,slot.ends);
-}
-let schemaReady;
-const ensureSchema = db => schemaReady ??= setupSchema(db).catch(error => { schemaReady = undefined; throw error; });
 const slotSql = 'SELECT s.*,c.name AS consultant_name,c.phone AS consultant_phone,c.email AS consultant_email FROM slots s JOIN consultants c ON c.id=s.consultant_id';
-const calendarRowsSql = `SELECT s.id,s.consultant_id,s.starts_at,s.ends_at,s.status,s.feedback_id,s.booked_at,s.cancelled_at,s.cancelled_by,s.student_phone,
+const calendarRowsSql = `SELECT s.id,s.consultant_id,s.starts_at,s.ends_at,s.status,f.id AS feedback_id,s.booked_at,s.cancelled_at,s.cancelled_by,
+  CASE WHEN st.id IS NOT NULL THEN s.student_phone END AS student_phone,
   c.name AS consultant_name,c.phone AS consultant_phone,st.name AS student_name,f.note
-  FROM slots s JOIN consultants c ON c.id=s.consultant_id LEFT JOIN students st ON st.id=s.student_id LEFT JOIN feedback f ON f.id=s.feedback_id
+  FROM slots s JOIN consultants c ON c.id=s.consultant_id LEFT JOIN students st ON st.id=s.student_id AND st.deleted_at IS NULL
+  LEFT JOIN feedback f ON f.id=s.feedback_id AND f.deleted_at IS NULL AND st.id IS NOT NULL
   WHERE s.starts_at>=? ORDER BY s.starts_at,c.name`;
 const bookingInfo = s => ({id:s.id,starts_at:s.starts_at,ends_at:s.ends_at,consultant_name:s.consultant_name,consultant_phone:s.consultant_phone});
 // Books a future open slot for one weekly check-in (any support answer). The conditional UPDATE means only one
@@ -248,17 +175,27 @@ const bookingInfo = s => ({id:s.id,starts_at:s.starts_at,ends_at:s.ends_at,consu
 async function book(db,studentId,feedbackId,slotId,phone) {
   const current=await first(db,slotSql+" WHERE s.feedback_id=? AND s.status='booked'",feedbackId);
   if (current) return {status:'booked',slot:bookingInfo(current)};
+  const at=now();
   let changes=0;
   try {
-    changes=(await run(db,`UPDATE slots SET status='booked',student_id=?,feedback_id=?,booked_at=?,student_phone=?
-      WHERE id=? AND status='open' AND starts_at>? AND consultant_id IN (SELECT id FROM consultants WHERE active=1)`,
-      studentId,feedbackId,now(),phone,slotId,now())).meta.changes;
-  } catch {}
-  const booked=await first(db,slotSql+" WHERE s.feedback_id=? AND s.status='booked'",feedbackId);
-  if (booked && changes) {
-    await run(db,'UPDATE students SET phone=? WHERE id=?',phone,studentId);
-    await run(db,"UPDATE feedback SET priority='follow',status='open' WHERE id=? AND priority='routine'",feedbackId);
+    const [booking]=await db.batch([
+      db.prepare(`UPDATE slots SET status='booked',student_id=?,feedback_id=?,booked_at=?,student_phone=?
+        WHERE id=? AND status='open' AND starts_at>? AND consultant_id IN (SELECT id FROM consultants WHERE active=1)
+        AND EXISTS(SELECT 1 FROM feedback f JOIN students st ON st.id=f.student_id
+          WHERE f.id=? AND st.id=? AND f.deleted_at IS NULL AND st.deleted_at IS NULL)`)
+        .bind(studentId,feedbackId,at,phone,slotId,at,feedbackId,studentId),
+      db.prepare(`UPDATE students SET phone=? WHERE id=? AND EXISTS(
+        SELECT 1 FROM slots WHERE id=? AND feedback_id=? AND booked_at=? AND status='booked')`)
+        .bind(phone,studentId,slotId,feedbackId,at),
+      db.prepare(`UPDATE feedback SET priority='follow',status='open' WHERE id=? AND priority='routine' AND EXISTS(
+        SELECT 1 FROM slots WHERE id=? AND feedback_id=? AND booked_at=? AND status='booked')`)
+        .bind(feedbackId,slotId,feedbackId,at)
+    ]);
+    changes=booking.meta.changes;
+  } catch(error) {
+    if (!String(error.message).includes('UNIQUE constraint failed: slots.feedback_id')) throw error;
   }
+  const booked=await first(db,slotSql+" WHERE s.feedback_id=? AND s.status='booked'",feedbackId);
   return booked ? {status:'booked',slot:bookingInfo(booked),fresh:!!changes,raw:booked} : {status:'taken'};
 }
 // Call booked / cancelled email for the student (consultant in cc), with a calendar invite in Italian time.
@@ -286,16 +223,19 @@ const mailerFor = env => env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET ? {url:env
 // Privacy rule: once RETENTION_MONTHS have passed after a program, the student's personal details and written
 // answers are removed; ratings stay for the statistics.
 async function anonymize(db,studentId) {
-  await run(db,`UPDATE students SET name='Former student', email='removed-'||id||'@invalid', token=?, phone=NULL, parent_email=NULL, anonymized_at=?
-    WHERE id=? AND anonymized_at IS NULL`,id().replaceAll('-','')+id().replaceAll('-',''),now(),studentId);
-  await run(db,"UPDATE feedback SET note='' WHERE student_id=?",studentId);
-  await run(db,"UPDATE feedback_edits SET previous_note='' WHERE feedback_id IN (SELECT id FROM feedback WHERE student_id=?)",studentId);
-  await run(db,`UPDATE final_feedback SET housing_comment='',school_comment='',social_comment='',local_support_comment='',team_support_comment='',
-    best='',improve='',advice='' WHERE student_id=?`,studentId);
-  await run(db,'UPDATE slots SET student_phone=NULL WHERE student_id=?',studentId);
-  // Passport, visa, family, school, contacts and documents are personal details: removed completely.
-  await run(db,'DELETE FROM student_files WHERE item_id IN (SELECT id FROM student_items WHERE student_id=?)',studentId);
-  await run(db,'DELETE FROM student_items WHERE student_id=?',studentId);
+  const removeContact=db.prepare(`UPDATE students SET name='Former student',email='removed-'||id||'@invalid',token=?,
+    phone=NULL,parent_email=NULL,anonymized_at=? WHERE id=? AND anonymized_at IS NULL`)
+    .bind(id().replaceAll('-','')+id().replaceAll('-',''),now(),studentId);
+  const clearPersonalData=[
+    "UPDATE feedback SET note='' WHERE student_id=?",
+    "UPDATE feedback_edits SET previous_note='' WHERE feedback_id IN (SELECT id FROM feedback WHERE student_id=?)",
+    `UPDATE final_feedback SET housing_comment='',school_comment='',social_comment='',local_support_comment='',
+      team_support_comment='',best='',improve='',advice='' WHERE student_id=?`,
+    'UPDATE slots SET student_phone=NULL WHERE student_id=?',
+    'DELETE FROM student_files WHERE item_id IN (SELECT id FROM student_items WHERE student_id=?)',
+    'DELETE FROM student_items WHERE student_id=?'
+  ];
+  await db.batch([removeContact,...clearPersonalData.map(sql=>db.prepare(sql).bind(studentId))]);
 }
 const monthsBefore = (date,months) => { const [y,m,d]=date.split('-').map(Number); return new Date(Date.UTC(y,m-1-months,d,12)).toISOString().slice(0,10); };
 const validDate = value => /^\d{4}-\d\d-\d\d$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
@@ -395,9 +335,21 @@ function browserSession(request) {
   const value=cookie?.slice(staffCookie.length+1);
   return /^[0-9a-f]{64}$/.test(value||'') ? value : null;
 }
+async function verifyPersonalLink(invite,configuration,allow) {
+  if (!configuration || typeof invite!=='string' || !/^[a-f0-9]{64}$/.test(invite)) return null;
+  try {
+    const issuedLinks=JSON.parse(configuration);
+    const fingerprint=await digest(invite);
+    const email=Object.hasOwn(issuedLinks,fingerprint)?issuedLinks[fingerprint]:null;
+    return allow.includes(email)?{email,reusable:true}:null;
+  } catch {
+    return null;
+  }
+}
 async function staffSignIn(request,env,allow) {
-  const {invite}=await request.json();
-  const grant=await verifyInvite(invite,env.STAFF_INVITE_SECRET,allow);
+  const {invite}=await request.json() || {};
+  const grant=await verifyPersonalLink(invite,env.STAFF_PERSONAL_LINKS,allow) ||
+    await verifyInvite(invite,env.STAFF_INVITE_SECRET,allow);
   if (!grant) return fail('This staff sign-in link is invalid or expired.',401);
   const session=id().replaceAll('-','')+id().replaceAll('-','');
   const expires=new Date(Date.now()+staffSessionAge*1000).toISOString();
@@ -423,7 +375,6 @@ async function api(request,env,ctx,url) {
 
   if (path==='/api/demo') return fail('Demo data is handled in the browser.',404);
   if (!db) return fail('The CRM database is unavailable.',503);
-  await ensureSchema(db);
   if (path==='/api/staff/sign-in' && method==='POST') return staffSignIn(request,env,allow);
   const session=browserSession(request);
   if (path==='/api/staff/sign-out' && method==='POST') {
@@ -480,23 +431,26 @@ async function api(request,env,ctx,url) {
     if (!/^[0-9a-f-]{36}$/i.test(submissionId)) return fail('Reload the form and try again.');
     const difficult = kind==='check-in' && answers.includes('difficult');
     const priority=priorityFor(kind,mood,need,difficult);
-    await run(db,`INSERT OR IGNORE INTO feedback
+    const saveFeedback=db.prepare(`INSERT OR IGNORE INTO feedback
       (id,student_id,week,kind,mood,need,topic,note,priority,status,created_at)
-      SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM students WHERE id=? AND deleted_at IS NULL)`,
-      submissionId,student.id,week,kind,kind==='message'?null:mood,need,topic,note,priority,priority==='routine'?'resolved':'open',now(),student.id);
-    const saved=await first(db,'SELECT kind FROM feedback WHERE id=? AND student_id=? AND deleted_at IS NULL',submissionId,student.id);
-    if (!saved) return fail('A check-in for this week already exists. Reload to send a separate message.',409);
-    if (saved.kind==='check-in' && kind==='check-in')
-      await run(db,'INSERT OR IGNORE INTO checkin_areas (feedback_id,studies,housing,social,health,money) VALUES (?,?,?,?,?,?)',submissionId,...answers);
+      SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM students WHERE id=? AND deleted_at IS NULL)`)
+      .bind(submissionId,student.id,week,kind,kind==='message'?null:mood,need,topic,note,priority,priority==='routine'?'resolved':'open',now(),student.id);
+    if (kind==='check-in') {
+      const saveAreas=db.prepare(`INSERT OR IGNORE INTO checkin_areas (feedback_id,studies,housing,social,health,money)
+        SELECT ?,?,?,?,?,? WHERE EXISTS(
+          SELECT 1 FROM feedback WHERE id=? AND student_id=? AND kind='check-in' AND week=? AND deleted_at IS NULL)`)
+        .bind(submissionId,...answers,submissionId,student.id,week);
+      await db.batch([saveFeedback,saveAreas]);
+    } else await saveFeedback.run();
     const record=await first(db,feedbackWithStudent+' WHERE f.id=? AND f.student_id=? AND f.deleted_at IS NULL AND s.deleted_at IS NULL',submissionId,student.id);
     if (!record) return fail('A check-in for this week already exists. Reload to send a separate message.',409);
-    if (sheet) ctx.waitUntil(deliver(db,sheet,feedbackEvent(record)).catch(()=>{}));
     // Optional call booking: from any weekly check-in that picked a slot, whatever the support answer.
-    const booking = kind==='check-in' && saved.kind==='check-in' && text(input.slot)
+    const booking = record.kind==='check-in' && text(input.slot)
       ? await book(db,student.id,submissionId,text(input.slot),phone) : null;
     const mailer=mailerFor(env);
     if (booking?.fresh && mailer) ctx.waitUntil(deliver(db,mailer,callEvent('booked',booking.raw,student)).catch(()=>{}));
     const finalPriority=booking?.fresh && record.priority==='routine' ? 'follow' : record.priority;
+    if (sheet) ctx.waitUntil(deliver(db,sheet,feedbackEvent({...record,priority:finalPriority,status:booking?.fresh && record.priority==='routine'?'open':record.status})).catch(()=>{}));
     return json({saved:true,priority:finalPriority,booking:booking&&{status:booking.status,slot:booking.slot}});
   }
 
@@ -529,25 +483,29 @@ async function api(request,env,ctx,url) {
     // A 1 or 2 on questions 4-8 needs a comment and becomes a follow-up in the Support queue.
     const low=finalRequiredTopics.filter(key=>scores[key]<=2);
     if (low.some(key=>!comments[key])) return fail('Tell us what went wrong for each topic you rated 1 or 2.');
-    const finalId=id();
-    const saved=await run(db,`INSERT OR IGNORE INTO final_feedback (id,student_id,overall,recommend,housing_type,
+    const finalId=id(), followupId=low.length?id():null, submittedAt=now();
+    const statements=[db.prepare(`INSERT OR IGNORE INTO final_feedback (id,student_id,overall,recommend,housing_type,
       housing,housing_comment,school,school_comment,social,social_comment,local_support,local_support_comment,team_support,team_support_comment,
-      travel,best,improve,advice,share_consent,future_contact,language,submitted_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      travel,best,improve,advice,share_consent,future_contact,language,submitted_at,followup_id)
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(
+        SELECT 1 FROM students WHERE id=? AND deleted_at IS NULL AND anonymized_at IS NULL)`).bind(
       finalId,student.id,overall,recommend,input.housing_type,
       scores.housing,comments.housing,scores.school,comments.school,scores.social,comments.social,
       scores.local_support,comments.local_support,scores.team_support,comments.team_support,
       scores.travel,best,improve,advice,input.share_consent==='yes'?1:0,given(input.future_contact)?(input.future_contact==='yes'?1:0):null,
-      input.language==='it'?'it':'en',now());
-    if (!saved.meta.changes) return fail('You have already sent your final feedback. Thank you!',409);
-    if (low.length) {
-      const followupId=id();
+      pickedLanguage||student.language||'en',submittedAt,followupId,student.id)];
+    if (followupId) {
       const note=low.map(key=>`${finalTopicNames[key]} ${scores[key]}/5: ${comments[key]}`).join('\n');
-      await run(db,`INSERT INTO feedback (id,student_id,week,kind,mood,need,topic,note,priority,status,created_at)
-        VALUES (?,?,?,'final',NULL,'none','',?,'follow','open',?)`,followupId,student.id,week,note,now());
-      await run(db,'UPDATE final_feedback SET followup_id=? WHERE id=?',followupId,finalId);
+      statements.push(db.prepare(`INSERT INTO feedback (id,student_id,week,kind,mood,need,topic,note,priority,status,created_at)
+        SELECT ?,?,?,'final',NULL,'none','',?,'follow','open',? WHERE EXISTS(SELECT 1 FROM final_feedback WHERE id=?)`)
+        .bind(followupId,student.id,week,note,submittedAt,finalId));
     }
-    const record=await first(db,finalRowsSql+' WHERE ff.id=?',finalId);
-    if (sheet) ctx.waitUntil(deliver(db,sheet,{id:'final-feedback:'+finalId,kind:'final-feedback',record}).catch(()=>{}));
+    const [saved]=await db.batch(statements);
+    if (!saved.meta.changes) return fail('You have already sent your final feedback. Thank you!',409);
+    if (sheet) {
+      const record=await first(db,finalRowsSql+' WHERE ff.id=?',finalId);
+      ctx.waitUntil(deliver(db,sheet,{id:'final-feedback:'+finalId,kind:'final-feedback',record}).catch(()=>{}));
+    }
     return json({saved:true,followup:low.length>0});
   }
 
@@ -558,6 +516,14 @@ async function api(request,env,ctx,url) {
   const staff=nativeStaff || invitedStaff;
   const actor=nativeStaff ? email : access?.email || 'automation';
   if (path==='/api/jobs' && method==='POST' && (staff||automation)) {
+    // Privacy rule (RETENTION_MONTHS): clear personal details of students whose program ended that long ago.
+    const retention=Number(env.RETENTION_MONTHS);
+    let anonymized=0;
+    if (Number.isInteger(retention) && retention>0) {
+      for (const old of await all(db,'SELECT id FROM students WHERE anonymized_at IS NULL AND end_date<? LIMIT 25',monthsBefore(day,retention))) {
+        await anonymize(db,old.id); anonymized++;
+      }
+    }
     const origin=url.origin;
     const eligible=await all(db,`SELECT s.* FROM students s WHERE s.deleted_at IS NULL AND start_date<=? AND end_date>=?
       AND NOT EXISTS(SELECT 1 FROM feedback f WHERE f.student_id=s.id AND f.kind='check-in' AND f.week=? AND f.deleted_at IS NULL)
@@ -577,7 +543,7 @@ async function api(request,env,ctx,url) {
     // Final feedback emails: the invitation on the end date, then reminders 4 and 10 days later, each only after
     // the previous one went out (so a late start never sends them all at once), and none once the student answers.
     const finished=await all(db,`SELECT s.id,s.name,s.email,s.token,s.end_date,s.language FROM students s
-      WHERE s.deleted_at IS NULL AND s.end_date<=? AND s.end_date>=?
+      WHERE s.deleted_at IS NULL AND s.anonymized_at IS NULL AND s.end_date<=? AND s.end_date>=?
       AND NOT EXISTS(SELECT 1 FROM final_feedback ff WHERE ff.student_id=s.id AND ff.deleted_at IS NULL)`,day,shiftDay(day,-finalClosesAfter));
     const finalSent=new Map((await all(db,"SELECT id,updated_at FROM delivery WHERE id LIKE 'final:%' AND state='sent'")).map(d=>[d.id,d.updated_at]));
     const finalDue=finished.flatMap(s=>{
@@ -589,7 +555,7 @@ async function api(request,env,ctx,url) {
       }
       return [finalEvent(s,next,url.origin)];
     }).slice(0,25);
-    const pendingFinal=await all(db,`${finalRowsSql} WHERE ff.deleted_at IS NULL
+    const pendingFinal=await all(db,`${finalRowsSql} WHERE ff.deleted_at IS NULL AND s.deleted_at IS NULL
       AND NOT EXISTS(SELECT 1 FROM delivery d WHERE d.id='final-feedback:'||ff.id AND d.state='sent') ORDER BY ff.submitted_at LIMIT 25`);
     // Weekly emails in the student's language (Italian until the student picks English on a form).
     const weeklyTexts={
@@ -604,14 +570,6 @@ async function api(request,env,ctx,url) {
       return {id:(attempt===1?'reminder:':'reminder-2:')+s.id+':'+week,kind:'weekly-reminder',attempt,week,language:lang,to:s.email,name:s.name,
         subject:texts.at(attempt-1),message:texts.at(attempt+1),link:origin+'/check-in#'+s.token};
     };
-    // Privacy rule (RETENTION_MONTHS): clear personal details of students whose program ended that long ago.
-    const retention=Number(env.RETENTION_MONTHS);
-    let anonymized=0;
-    if (Number.isInteger(retention) && retention>0) {
-      for (const old of await all(db,'SELECT id FROM students WHERE anonymized_at IS NULL AND end_date<? LIMIT 25',monthsBefore(day,retention))) {
-        await anonymize(db,old.id); anonymized++;
-      }
-    }
     const outcomes=[];
     for(const [destination,events] of [
       [env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET?{url:env.REMINDER_WEBHOOK_URL,secret:env.WEBHOOK_SECRET}:null,
@@ -664,7 +622,7 @@ async function api(request,env,ctx,url) {
       const result=await run(db,`UPDATE OR IGNORE students SET name=?, email=?, destination=?, start_date=?, end_date=?,
         phone=?, parent_email=?, language=?, token=CASE WHEN email<>? THEN ? ELSE token END WHERE id=? AND deleted_at IS NULL`,
         name,address,destination,start,end,phone||null,parentEmail||null,language,address,token,studentId);
-      if (result.meta.changes) { await audit(db,actor,'student edited','student',studentId,name); return json({saved:true}); }
+      if (result.meta.changes) { await audit(db,actor,'student edited','student',studentId); return json({saved:true}); }
       const existing=await first(db,'SELECT id FROM students WHERE id=? AND deleted_at IS NULL',studentId);
       return existing ? fail('This student email already exists.',409) : fail('The student record was not found.',404);
     }
@@ -676,15 +634,16 @@ async function api(request,env,ctx,url) {
     const invalid=checked.find(item=>item.error);
     if (invalid) return fail(invalid.error);
     const studentId=id();
-    const result=await run(db,'INSERT OR IGNORE INTO students (id,name,email,destination,start_date,end_date,token,phone,parent_email,language) VALUES (?,?,?,?,?,?,?,?,?,?)',
-      studentId,name,address,destination,start,end,token,phone||null,parentEmail||null,language);
-    if (result.meta.changes) {
-      await audit(db,actor,'student added','student',studentId,name);
-      for (const item of checked) {
-        const itemId=await storeItem(db,actor,{id:studentId},item);
-        await audit(db,actor,'detail added','student item',itemId,itemLabel(item.kind,item.data)+' · '+name);
-      }
+    if (await first(db,'SELECT id FROM students WHERE email=? AND deleted_at IS NULL',address))
+      return fail('This student email already exists.',409);
+    const addStudent=db.prepare('INSERT INTO students (id,name,email,destination,start_date,end_date,token,phone,parent_email,language) VALUES (?,?,?,?,?,?,?,?,?,?)')
+      .bind(studentId,name,address,destination,start,end,token,phone||null,parentEmail||null,language);
+    try {
+      await db.batch([addStudent,...checked.flatMap(item=>itemStatements(db,actor,studentId,item,id()))]);
+      await audit(db,actor,'student added','student',studentId);
       return json({saved:true,id:studentId},201);
+    } catch(error) {
+      if (!String(error.message).includes('UNIQUE constraint failed: students.email')) throw error;
     }
     const removed=await first(db,'SELECT id FROM students WHERE email=? AND deleted_at IS NOT NULL',address);
     return fail(removed?'This student is in Recently deleted. Restore them to use this email.':'This student email already exists.',409);
@@ -699,9 +658,7 @@ async function api(request,env,ctx,url) {
     const result=await run(db,`UPDATE OR IGNORE ${table} SET deleted_at=? WHERE id=?${allowedParent}`,
       deleting?now():null,recordId);
     if (result.meta.changes) {
-      const label=table==='students'?(await first(db,'SELECT name FROM students WHERE id=?',recordId))?.name
-        :(await first(db,'SELECT s.name FROM feedback f JOIN students s ON s.id=f.student_id WHERE f.id=?',recordId))?.name;
-      await audit(db,actor,(table==='students'?'student ':'response ')+(deleting?'deleted':'restored'),table==='students'?'student':'feedback',recordId,label||'');
+      await audit(db,actor,(table==='students'?'student ':'response ')+(deleting?'deleted':'restored'),table==='students'?'student':'feedback',recordId);
       return json({saved:true});
     }
     const record=await first(db,`SELECT id FROM ${table} WHERE id=?${allowedParent}`,recordId);
@@ -747,8 +704,8 @@ async function api(request,env,ctx,url) {
     const result=await run(db,"UPDATE slots SET status='cancelled',cancelled_at=?,cancelled_by=? WHERE id=? AND status='booked'",now(),actor,slotId);
     if (!result.meta.changes) return fail('The appointment was not found or is already cancelled.',404);
     const slot=await first(db,slotSql+' WHERE s.id=?',slotId);
-    const student=await first(db,'SELECT name,email,language FROM students WHERE id=?',slot.student_id);
-    await audit(db,actor,'call cancelled','slot',slotId,`${slot.consultant_name} ${slot.starts_at} ${student?.name||''}`);
+    const student=await first(db,'SELECT name,email,language FROM students WHERE id=? AND deleted_at IS NULL AND anonymized_at IS NULL',slot.student_id);
+    await audit(db,actor,'call cancelled','slot',slotId,slot.starts_at);
     const mailer=mailerFor(env);
     if (mailer && student) ctx.waitUntil(deliver(db,mailer,callEvent('cancelled',slot,student)).catch(()=>{}));
     return json({saved:true});
@@ -790,14 +747,24 @@ async function api(request,env,ctx,url) {
       }
     }
     if (candidates.length>1500) return fail('That would add more than 1,500 times. Choose fewer weeks or time blocks.');
-    const taken=await all(db,`SELECT consultant_id,starts_at,ends_at FROM slots WHERE status!='cancelled' AND ends_at>? AND consultant_id IN (${chosen.map(()=>'?').join(',')})`,now(),...chosen);
-    let added=0, skipped=0;
+    const cutoff=now();
+    const taken=await all(db,`SELECT consultant_id,starts_at,ends_at FROM slots WHERE status!='cancelled' AND ends_at>? AND consultant_id IN (${chosen.map(()=>'?').join(',')})`,cutoff,...chosen);
+    const additions=[];
     for (const slot of candidates) {
-      if (slot.starts<=now() || taken.some(t=>t.consultant_id===slot.consultant&&t.starts_at<slot.ends&&t.ends_at>slot.starts)) { skipped++; continue; }
-      await run(db,"INSERT INTO slots (id,consultant_id,starts_at,ends_at,status) VALUES (?,?,?,?,'open')",id(),slot.consultant,slot.starts,slot.ends);
+      if (slot.starts<=cutoff || taken.some(t=>t.consultant_id===slot.consultant&&t.starts_at<slot.ends&&t.ends_at>slot.starts)) continue;
+      additions.push([id(),slot.consultant,slot.starts,slot.ends]);
       taken.push({consultant_id:slot.consultant,starts_at:slot.starts,ends_at:slot.ends});
-      added++;
     }
+    const result=await run(db,`WITH new_slots AS (
+      SELECT json_extract(value,'$[0]') AS id,json_extract(value,'$[1]') AS consultant_id,
+        json_extract(value,'$[2]') AS starts_at,json_extract(value,'$[3]') AS ends_at FROM json_each(?)
+      )
+      INSERT INTO slots (id,consultant_id,starts_at,ends_at,status)
+      SELECT n.id,n.consultant_id,n.starts_at,n.ends_at,'open' FROM new_slots n
+      JOIN consultants c ON c.id=n.consultant_id AND c.active=1
+      WHERE NOT EXISTS(SELECT 1 FROM slots s WHERE s.consultant_id=n.consultant_id
+        AND s.status!='cancelled' AND s.starts_at<n.ends_at AND s.ends_at>n.starts_at)`,JSON.stringify(additions));
+    const added=result.meta.changes, skipped=candidates.length-added;
     await audit(db,actor,'recurring availability added','slot',null,`${chosen.join(', ')} · ${blocks.map(b=>b.from+'-'+b.to).join(', ')} · weeks: ${weeks} · added: ${added}`);
     return json({saved:true,added,skipped},201);
   }
@@ -821,11 +788,15 @@ async function api(request,env,ctx,url) {
     if (times.length>maxSlotsPerAdd) return fail('Add at most 24 times at once.');
     const added=times.map(time=>{const starts=italianTime(date,time);return {starts,ends:new Date(Date.parse(starts)+minutes*60000).toISOString()};});
     if (added[0].starts<=now()) return fail('Choose times in the future.');
-    const overlap=await first(db,"SELECT 1 AS found FROM slots WHERE consultant_id=? AND status!='cancelled' AND starts_at<? AND ends_at>?",consultant.id,added.at(-1).ends,added[0].starts);
-    if (overlap) return fail('Some of these times overlap with this consultant’s existing availability.',409);
-    for (const slot of added) await run(db,"INSERT INTO slots (id,consultant_id,starts_at,ends_at,status) VALUES (?,?,?,?,'open')",id(),consultant.id,slot.starts,slot.ends);
+    const values=added.map(()=>'(?,?,?)').join(',');
+    const result=await run(db,`WITH new_slots(id,starts_at,ends_at) AS (VALUES ${values})
+      INSERT INTO slots (id,consultant_id,starts_at,ends_at,status)
+      SELECT id,?,starts_at,ends_at,'open' FROM new_slots
+      WHERE NOT EXISTS(SELECT 1 FROM slots WHERE consultant_id=? AND status!='cancelled' AND starts_at<? AND ends_at>?)`,
+      ...added.flatMap(slot=>[id(),slot.starts,slot.ends]),consultant.id,consultant.id,added.at(-1).ends,added[0].starts);
+    if (!result.meta.changes) return fail('Some of these times overlap with this consultant’s existing availability.',409);
     await audit(db,actor,'availability added','slot',null,`${consultant.id} ${date} ${from}-${to}`);
-    return json({saved:true,added:added.length},201);
+    return json({saved:true,added:result.meta.changes},201);
   }
   // Staff remove an open slot. Booked or cancelled slots are never removed, so no booking is lost.
   if (path==='/api/slots/remove' && method==='POST') {
@@ -847,7 +818,7 @@ async function api(request,env,ctx,url) {
     if (!(env.REMINDER_WEBHOOK_URL&&env.WEBHOOK_SECRET)) return fail('Connect a reminder webhook to send emails.',409);
     const invited=await first(db,"SELECT id FROM delivery WHERE id=? AND state='sent'",'final:'+student.id+':1');
     const state=await deliver(db,{url:env.REMINDER_WEBHOOK_URL,secret:env.WEBHOOK_SECRET},finalEvent(student,invited?'manual-'+Date.now():1,url.origin));
-    if (state==='sent') await audit(db,actor,'final feedback form sent','student',student.id,student.name);
+    if (state==='sent') await audit(db,actor,'final feedback form sent','student',student.id);
     return state==='sent' ? json({sent:true}) : fail('The email could not be sent. Try again.',502);
   }
   // Student details: add or edit one (with an optional file), remove one, open its file.
@@ -863,24 +834,27 @@ async function api(request,env,ctx,url) {
         return fail('This detail was not found. Reload the page and try again.',404);
     } else if ((await first(db,'SELECT COUNT(*) AS n FROM student_items WHERE student_id=?',student.id)).n>=maxItemsPerStudent)
       return fail('This student already has the maximum number of details.',409);
-    const savedId=await storeItem(db,actor,student,item,itemId||null,input.remove_file===true);
-    await audit(db,actor,itemId?'detail edited':'detail added','student item',savedId,itemLabel(item.kind,item.data)+' · '+student.name);
+    const savedId=itemId||id();
+    await db.batch(itemStatements(db,actor,student.id,item,savedId,!!itemId,input.remove_file===true));
+    await audit(db,actor,itemId?'detail edited':'detail added','student item',savedId,item.kind);
     return json({saved:true,id:savedId},itemId?200:201);
   }
   if (path==='/api/items/delete' && method==='POST') {
     const input=await request.json() || {};
-    const item=await first(db,'SELECT i.id,i.kind,i.data,s.name FROM student_items i JOIN students s ON s.id=i.student_id WHERE i.id=? AND s.deleted_at IS NULL',text(input.id));
+    const item=await first(db,'SELECT i.id,i.kind FROM student_items i JOIN students s ON s.id=i.student_id WHERE i.id=? AND s.deleted_at IS NULL',text(input.id));
     if (!item) return fail('This detail was not found. Reload the page and try again.',404);
-    await run(db,'DELETE FROM student_files WHERE item_id=?',item.id);
-    await run(db,'DELETE FROM student_items WHERE id=?',item.id);
-    await audit(db,actor,'detail removed','student item',item.id,itemLabel(item.kind,JSON.parse(item.data||'{}'))+' · '+item.name);
+    await db.batch([
+      db.prepare('DELETE FROM student_files WHERE item_id=?').bind(item.id),
+      db.prepare('DELETE FROM student_items WHERE id=?').bind(item.id)
+    ]);
+    await audit(db,actor,'detail removed','student item',item.id,item.kind);
     return json({saved:true});
   }
   if (path==='/api/items/file' && method==='GET') {
-    const file=await first(db,`SELECT f.name,f.type,f.content,i.id,i.kind,i.data,s.name AS student_name FROM student_files f
+    const file=await first(db,`SELECT f.name,f.type,f.content,i.id,i.kind FROM student_files f
       JOIN student_items i ON i.id=f.item_id JOIN students s ON s.id=i.student_id WHERE f.item_id=? AND s.deleted_at IS NULL`,text(url.searchParams.get('id')));
     if (!file) return fail('This file was not found.',404);
-    await audit(db,actor,'file opened','student item',file.id,itemLabel(file.kind,JSON.parse(file.data||'{}'))+' · '+file.student_name);
+    await audit(db,actor,'file opened','student item',file.id,file.kind);
     const bytes=Uint8Array.from(atob(file.content),ch=>ch.charCodeAt(0));
     // Types come from a fixed list (never HTML or SVG); PDFs and photos open in the browser, the rest download.
     const inline=['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type);

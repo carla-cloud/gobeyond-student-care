@@ -12,6 +12,13 @@ for (const [table,file] of [['staff_access','0001_staff_access'],['feedback_edit
 if (!db.prepare("SELECT name FROM pragma_table_info('students') WHERE name='deleted_at'").get()) {
  db.exec(await readFile('drizzle/0003_record_removals.sql','utf8'));
 }
+for (const file of ['0004_checkin_areas.sql','0005_consultant_calendar.sql',
+ '0006_final_feedback.sql','0007_audit_log.sql','0008_student_details.sql']) {
+ db.exec(await readFile('drizzle/'+file,'utf8'));
+}
+if (!db.prepare("SELECT name FROM pragma_table_info('students') WHERE name='anonymized_at'").get()) {
+ db.exec(await readFile('drizzle/0009_student_and_calendar_fields.sql','utf8'));
+}
 const DB={
  prepare(sql){return {bind(...args){return {
   async first(){return db.prepare(sql).get(...args)??null;},
